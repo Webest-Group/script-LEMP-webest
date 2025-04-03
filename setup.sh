@@ -28,7 +28,8 @@ fi
 INSTALL_DIR="/opt/webestvps"
 CONFIG_DIR="/etc/webestvps"
 LOG_DIR="/var/log/webestvps"
-mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR"
+WEB_ROOT="/home/websites"
+mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR" "$WEB_ROOT"
 
 # Log file
 LOG_FILE="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S).log"
@@ -41,9 +42,14 @@ log() {
 echo -e "${GREEN}=== BẮT ĐẦU CÀI ĐẶT WEBEST VPS PANEL ===${NC}"
 echo
 
+# Sửa lỗi dpkg bị gián đoạn
+log "Kiểm tra và sửa lỗi dpkg..."
+dpkg --configure -a
+
 # Cập nhật hệ thống
 log "Đang cập nhật hệ thống..."
-apt update && apt upgrade -y
+apt update
+apt upgrade -y
 
 # 1. Cài đặt Nginx
 log "Đang cài đặt Nginx..."
@@ -54,18 +60,20 @@ systemctl start nginx
 # 2. Cài đặt PHP và các extension
 log "Đang cài đặt PHP và các extension..."
 apt install -y software-properties-common
-add-apt-repository -y ppa:ondrej/php
+LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
 apt update
 apt install -y php8.1-fpm php8.1-cli php8.1-common php8.1-mysql php8.1-zip \
     php8.1-gd php8.1-mbstring php8.1-curl php8.1-xml php8.1-bcmath php8.1-intl
 
 # Cấu hình PHP
 PHP_INI="/etc/php/8.1/fpm/php.ini"
-sed -i 's/memory_limit = .*/memory_limit = 256M/' "$PHP_INI"
-sed -i 's/upload_max_filesize = .*/upload_max_filesize = 64M/' "$PHP_INI"
-sed -i 's/post_max_size = .*/post_max_size = 64M/' "$PHP_INI"
-sed -i 's/max_execution_time = .*/max_execution_time = 300/' "$PHP_INI"
-sed -i 's/;date.timezone.*/date.timezone = Asia\/Ho_Chi_Minh/' "$PHP_INI"
+if [ -f "$PHP_INI" ]; then
+    sed -i 's/memory_limit = .*/memory_limit = 256M/' "$PHP_INI"
+    sed -i 's/upload_max_filesize = .*/upload_max_filesize = 64M/' "$PHP_INI"
+    sed -i 's/post_max_size = .*/post_max_size = 64M/' "$PHP_INI"
+    sed -i 's/max_execution_time = .*/max_execution_time = 300/' "$PHP_INI"
+    sed -i 's/;date.timezone.*/date.timezone = Asia\/Ho_Chi_Minh/' "$PHP_INI"
+fi
 
 systemctl enable php8.1-fpm
 systemctl restart php8.1-fpm
@@ -74,21 +82,17 @@ systemctl restart php8.1-fpm
 log "Đang cài đặt MariaDB..."
 apt install -y mariadb-server mariadb-client
 
-# Bảo mật MariaDB
-mysql_secure_installation <<EOF
+# Đảm bảo MariaDB đang chạy
+systemctl enable mariadb
+systemctl start mariadb
 
-y
-webest@2024
-webest@2024
-y
-y
-y
-y
-EOF
-
-# Tạo user root với mật khẩu
-mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'webest@2024';"
-mysql -e "FLUSH PRIVILEGES;"
+# Bảo mật MariaDB và đặt mật khẩu root
+mysql -e "UPDATE mysql.user SET Password = PASSWORD('webest@2024') WHERE User = 'root'"
+mysql -e "DELETE FROM mysql.user WHERE User=''"
+mysql -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+mysql -e "DROP DATABASE IF EXISTS test"
+mysql -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%'"
+mysql -e "FLUSH PRIVILEGES"
 
 # 4. Cài đặt Redis
 log "Đang cài đặt Redis..."
@@ -116,12 +120,15 @@ log "Đang cài đặt các công cụ bảo mật..."
 apt install -y ufw fail2ban
 
 # Cấu hình UFW
-ufw allow 'Nginx Full'
-ufw allow 'OpenSSH'
-echo "y" | ufw enable
+ufw --force enable
+ufw allow ssh
+ufw allow http
+ufw allow https
 
 # Cấu hình Fail2ban
-cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+if [ -f "/etc/fail2ban/jail.conf" ]; then
+    cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+fi
 systemctl enable fail2ban
 systemctl start fail2ban
 
@@ -135,23 +142,27 @@ systemctl start supervisor
 log "Đang cài đặt các công cụ hữu ích..."
 apt install -y zip unzip git curl wget htop
 
-# Tạo thư mục web mặc định
-mkdir -p /var/www
-chown -R www-data:www-data /var/www
+# Tạo thư mục web mặc định và phân quyền
+mkdir -p "$WEB_ROOT"
+chown -R www-data:www-data "$WEB_ROOT"
+chmod -R 755 "$WEB_ROOT"
+
+# Tạo thư mục cho domain mặc định
+mkdir -p "$WEB_ROOT/default"
 
 # Cấu hình Nginx mặc định
-cat > /etc/nginx/sites-available/default << 'EOF'
+cat > /etc/nginx/sites-available/default << EOF
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
     
-    root /var/www/html;
+    root $WEB_ROOT/default;
     index index.php index.html index.htm;
     
     server_name _;
     
     location / {
-        try_files $uri $uri/ /index.php?$query_string;
+        try_files \$uri \$uri/ /index.php?\$query_string;
     }
     
     location ~ \.php$ {
@@ -165,11 +176,14 @@ server {
 }
 EOF
 
+# Tạo symbolic link cho cấu hình Nginx
+ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
+
 # Khởi động lại Nginx
 systemctl restart nginx
 
 # Tạo trang chào mừng
-cat > /var/www/html/index.html << 'EOF'
+cat > "$WEB_ROOT/default/index.html" << 'EOF'
 <!DOCTYPE html>
 <html>
 <head>
@@ -222,7 +236,7 @@ cat > /var/www/html/index.html << 'EOF'
 EOF
 
 # Phân quyền cho trang chào mừng
-chown -R www-data:www-data /var/www/html
+chown -R www-data:www-data "$WEB_ROOT/default"
 
 # Tạo file version
 echo "1.0.0" > "$CONFIG_DIR/version"
@@ -232,8 +246,8 @@ echo -e "${GREEN}=== CÀI ĐẶT HOÀN TẤT ===${NC}"
 echo
 echo -e "${YELLOW}Thông tin quan trọng:${NC}"
 echo "- MariaDB Root Password: webest@2024"
+echo "- Thư mục web root: $WEB_ROOT"
 echo "- Các port đã mở: 22 (SSH), 80 (HTTP), 443 (HTTPS)"
-echo "- Thư mục web mặc định: /var/www"
 echo "- Thư mục cấu hình: $CONFIG_DIR"
 echo "- Thư mục logs: $LOG_DIR"
 echo
