@@ -1,108 +1,111 @@
 # WebEST VPS Panel
 
-Panel quản lý VPS với các tính năng tự động hóa cho LEMP stack.
+Panel quan ly VPS voi cac chuc nang:
+- Quan ly domain (Laravel, WordPress, Code normal)
+- Quan ly database
+- Cai dat SSL
+- Backup
+- Quan ly service
+- Setup Git Hook
+- Cap nhat tu dong
 
-## Cài đặt
+## Cai dat
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main/install.sh | sudo bash
 ```
 
-Sau khi cài đặt xong, sử dụng lệnh:
-```bash
-webestvps
-```
+Sau khi cai dat xong, chay lenh `webestvps` de su dung panel.
 
-## Hướng dẫn sử dụng
+## Huong dan su dung
 
-### 1. Tạo domain
-- Chọn mục 1
-- Nhập tên domain (ví dụ: example.com)
-- Script sẽ tạo thư mục và cấu hình Nginx tự động
+### 1. Quan ly Domain
 
-### 2. Cài đặt SSL
-- Chọn mục 2
-- Nhập tên domain cần cài SSL
-- Script sẽ cài đặt Certbot và cấu hình SSL tự động
+#### 1.1. Tao domain moi
+- Nhap ten domain
+- Chon loai domain:
+  - Laravel: Tu dong tao .env, database va cau hinh
+  - WordPress: Tu dong tai va cai dat WordPress
+  - Code normal: Tao trang web co ban
 
-### 3. Tạo database
-- Chọn mục 3
-- Nhập tên database
-- Nhập tên user
-- Nhập mật khẩu
-- Script sẽ tạo database và user với quyền truy cập
+#### 1.2. Xoa domain
+- Nhap ten domain can xoa
+- Xac nhan xoa
+- Tu dong xoa thu muc va cau hinh Nginx
+
+#### 1.3. Xem danh sach domain
+- Hien thi tat ca domain dang co
+- Thong tin chi tiet:
+  - Duong dan thu muc
+  - Cau hinh Nginx
+  - Trang thai hoat dong
+
+### 2. Quan ly Database
+
+#### 2.1. Tao database moi
+- Nhap ten database
+- Nhap ten user
+- Nhap mat khau
+- Tu dong tao database va user
+
+#### 2.2. Xoa database
+- Nhap ten database can xoa
+- Xac nhan xoa
+- Tu dong xoa database va user
+
+#### 2.3. Xem danh sach database
+- Hien thi tat ca database dang co
+- Thong tin chi tiet:
+  - Ten database
+  - User
+  - Quyen truy cap
+
+### 3. Cai dat SSL
+- Nhap ten domain can cai SSL
+- Tu dong cai dat Certbot
+- Cau hinh Nginx voi SSL
 
 ### 4. Backup
-- Chọn mục 4
-- Nhập tên domain cần backup
-- Script sẽ backup:
-  - Toàn bộ file trong thư mục domain
-  - Database (nếu là WordPress)
+- Nhap ten domain can backup
+- Tu dong backup:
+  - Files trong thu muc domain
+  - Database (neu co)
 
-### 5. Quản lý service
-- Chọn mục 5
-- Chọn service cần quản lý:
-  1. Nginx
-  2. PHP-FPM
-  3. MariaDB
-  4. Redis
-- Chọn tác vụ:
-  1. Khởi động service
-  2. Dừng service
-  3. Khởi động lại service
-  4. Kiểm tra trạng thái service
+### 5. Quan ly Service
+- Chon service can quan ly:
+  - Nginx
+  - PHP-FPM
+  - MariaDB
+  - Redis
+- Cac tac vu:
+  - Khoi dong
+  - Dung
+  - Khoi dong lai
+  - Kiem tra trang thai
 
-### 6. Setup Git Hook (Tự động cập nhật code từ GitHub)
+### 6. Setup Git Hook
+- Nhap ten domain
+- Nhap ten repository (user/repo)
+- Nhap ten branch (mac dinh: main)
+- Tu dong:
+  - Khoi tao Git repository
+  - Tao webhook endpoint
+  - Cau hinh Nginx
+  - Cap nhat code tu dong khi co push
 
-#### Bước 1: Tạo SSH key trên server
-```bash
-# Tạo SSH key
-ssh-keygen -t ed25519 -C "your-email@example.com"
-# Hiển thị public key
-cat ~/.ssh/id_ed25519.pub
-```
+### 7. Cap nhat WebEST VPS
+- Tu dong kiem tra phien ban moi
+- Cap nhat cac file cau hinh
+- Khoi dong lai panel
 
-#### Bước 2: Thêm SSH key vào GitHub
-1. Vào GitHub > Settings > SSH and GPG keys
-2. Click "New SSH key"
-3. Nhập:
-   - Title: Tên server (ví dụ: Production Server)
-   - Key: Dán nội dung public key đã copy ở bước 1
-4. Click "Add SSH key"
+## Yeu cau he thong
+- Ubuntu 20.04 hoac cao hon
+- Quyen root hoac sudo
+- Ket noi Internet
+- Toi thieu 1GB RAM
+- Toi thieu 10GB dung luong
 
-#### Bước 3: Cấu hình Git Hook
-1. Chọn mục 6 trong menu
-2. Nhập thông tin:
-   - Tên domain: example.com
-   - Tên repository: user/repo (ví dụ: Webest-Group/script-LEMP-webest)
-   - Tên branch: main (hoặc branch bạn muốn theo dõi)
-
-#### Bước 4: Cấu hình Webhook trên GitHub
-1. Vào repository trên GitHub
-2. Vào Settings > Webhooks > Add webhook
-3. Nhập thông tin:
-   - Payload URL: `http://example.com/webhook.php`
-   - Content type: `application/json`
-   - Secret: `webestvps`
-   - Events: Chọn "Just the push event"
-4. Click "Add webhook"
-
-#### Bước 5: Kiểm tra hoạt động
-1. Push một thay đổi lên repository
-2. Kiểm tra log webhook trên GitHub
-3. Kiểm tra file trên server đã được cập nhật
-
-### 7. Cập nhật WebEST VPS
-- Chọn mục 7
-- Script sẽ kiểm tra phiên bản mới
-- Nếu có phiên bản mới, chọn y để cập nhật
-
-### 8. Thoát
-- Chọn mục 8 để thoát khỏi panel
-
-## Lưu ý
-- Đảm bảo chạy script với quyền root (sudo)
-- Kiểm tra log nếu gặp lỗi
-- Đảm bảo domain đã được trỏ về server
-- Đảm bảo server có quyền truy cập repository GitHub
-- Nếu gặp lỗi webhook, kiểm tra log của Nginx và PHP-FPM 
+## Lien he
+- Website: https://webest.vn
+- Email: support@webest.vn
+- GitHub: https://github.com/Webest-Group/script-LEMP-webest 
