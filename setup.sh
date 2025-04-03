@@ -24,55 +24,223 @@ else
     exit 1
 fi
 
-# Tạo thư mục cài đặt
-INSTALL_DIR="/tmp/server-setup"
-mkdir -p "$INSTALL_DIR"
-cd "$INSTALL_DIR" || exit
+# Tạo thư mục cài đặt và logs
+INSTALL_DIR="/opt/webestvps"
+CONFIG_DIR="/etc/webestvps"
+LOG_DIR="/var/log/webestvps"
+mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR"
 
-# Tải các module từ GitHub
-echo -e "${GREEN}Đang tải các module...${NC}"
+# Log file
+LOG_FILE="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S).log"
 
-# URL của repository (thay thế bằng URL thực tế của bạn)
-REPO_URL="https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main"
+# Function ghi log
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
 
-# Tải các module
-modules=(
-    "install.sh"
-    "modules/webserver.sh"
-    "modules/php.sh"
-    "modules/database.sh"
-    "modules/ssl.sh"
-    "modules/security.sh"
-    "modules/monitoring.sh"
-    "modules/optimization.sh"
-    "modules/backup.sh"
-    "modules/domain.sh"
-    "modules/development.sh"
-    "modules/nodejs_mongodb.sh"
-)
+echo -e "${GREEN}=== BẮT ĐẦU CÀI ĐẶT WEBEST VPS PANEL ===${NC}"
+echo
 
-# Tạo thư mục modules
-mkdir -p modules
+# Cập nhật hệ thống
+log "Đang cập nhật hệ thống..."
+apt update && apt upgrade -y
 
-# Tải từng module
-for module in "${modules[@]}"; do
-    echo "Đang tải $module..."
-    curl -sSL "$REPO_URL/$module" -o "$module"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Lỗi khi tải $module${NC}"
-        exit 1
-    fi
-done
+# 1. Cài đặt Nginx
+log "Đang cài đặt Nginx..."
+apt install -y nginx
+systemctl enable nginx
+systemctl start nginx
 
-# Cấp quyền thực thi cho các script
-chmod +x install.sh
-chmod +x modules/*.sh
+# 2. Cài đặt PHP và các extension
+log "Đang cài đặt PHP và các extension..."
+apt install -y software-properties-common
+add-apt-repository -y ppa:ondrej/php
+apt update
+apt install -y php8.1-fpm php8.1-cli php8.1-common php8.1-mysql php8.1-zip \
+    php8.1-gd php8.1-mbstring php8.1-curl php8.1-xml php8.1-bcmath php8.1-intl
 
-# Chạy script cài đặt
-./install.sh
+# Cấu hình PHP
+PHP_INI="/etc/php/8.1/fpm/php.ini"
+sed -i 's/memory_limit = .*/memory_limit = 256M/' "$PHP_INI"
+sed -i 's/upload_max_filesize = .*/upload_max_filesize = 64M/' "$PHP_INI"
+sed -i 's/post_max_size = .*/post_max_size = 64M/' "$PHP_INI"
+sed -i 's/max_execution_time = .*/max_execution_time = 300/' "$PHP_INI"
+sed -i 's/;date.timezone.*/date.timezone = Asia\/Ho_Chi_Minh/' "$PHP_INI"
 
-# Dọn dẹp
-cd /
-rm -rf "$INSTALL_DIR"
+systemctl enable php8.1-fpm
+systemctl restart php8.1-fpm
 
-echo -e "${GREEN}Cài đặt hoàn tất!${NC}" 
+# 3. Cài đặt MariaDB
+log "Đang cài đặt MariaDB..."
+apt install -y mariadb-server mariadb-client
+
+# Bảo mật MariaDB
+mysql_secure_installation <<EOF
+
+y
+webest@2024
+webest@2024
+y
+y
+y
+y
+EOF
+
+# Tạo user root với mật khẩu
+mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'webest@2024';"
+mysql -e "FLUSH PRIVILEGES;"
+
+# 4. Cài đặt Redis
+log "Đang cài đặt Redis..."
+apt install -y redis-server php8.1-redis
+systemctl enable redis-server
+systemctl start redis-server
+
+# 5. Cài đặt Composer
+log "Đang cài đặt Composer..."
+curl -sS https://getcomposer.org/installer | php
+mv composer.phar /usr/local/bin/composer
+chmod +x /usr/local/bin/composer
+
+# 6. Cài đặt Node.js và NPM
+log "Đang cài đặt Node.js và NPM..."
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt install -y nodejs
+
+# 7. Cài đặt Certbot (Let's Encrypt)
+log "Đang cài đặt Certbot..."
+apt install -y certbot python3-certbot-nginx
+
+# 8. Cài đặt các công cụ bảo mật
+log "Đang cài đặt các công cụ bảo mật..."
+apt install -y ufw fail2ban
+
+# Cấu hình UFW
+ufw allow 'Nginx Full'
+ufw allow 'OpenSSH'
+echo "y" | ufw enable
+
+# Cấu hình Fail2ban
+cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+systemctl enable fail2ban
+systemctl start fail2ban
+
+# 9. Cài đặt Supervisor
+log "Đang cài đặt Supervisor..."
+apt install -y supervisor
+systemctl enable supervisor
+systemctl start supervisor
+
+# 10. Cài đặt các công cụ hữu ích khác
+log "Đang cài đặt các công cụ hữu ích..."
+apt install -y zip unzip git curl wget htop
+
+# Tạo thư mục web mặc định
+mkdir -p /var/www
+chown -R www-data:www-data /var/www
+
+# Cấu hình Nginx mặc định
+cat > /etc/nginx/sites-available/default << 'EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    
+    root /var/www/html;
+    index index.php index.html index.htm;
+    
+    server_name _;
+    
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+    
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+    }
+    
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOF
+
+# Khởi động lại Nginx
+systemctl restart nginx
+
+# Tạo trang chào mừng
+cat > /var/www/html/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome to WebEST VPS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 40px;
+            background: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to WebEST VPS</h1>
+        <p class="success">✅ Server đã được cài đặt thành công!</p>
+        <p>Các thành phần đã được cài đặt:</p>
+        <ul>
+            <li>Nginx</li>
+            <li>PHP 8.1</li>
+            <li>MariaDB</li>
+            <li>Redis</li>
+            <li>Composer</li>
+            <li>Node.js & NPM</li>
+            <li>Certbot (SSL)</li>
+            <li>UFW & Fail2ban</li>
+            <li>Supervisor</li>
+        </ul>
+        <p>Để quản lý server, sử dụng lệnh: <strong>webestvps</strong></p>
+    </div>
+</body>
+</html>
+EOF
+
+# Phân quyền cho trang chào mừng
+chown -R www-data:www-data /var/www/html
+
+# Tạo file version
+echo "1.0.0" > "$CONFIG_DIR/version"
+touch "$CONFIG_DIR/installed"
+
+echo -e "${GREEN}=== CÀI ĐẶT HOÀN TẤT ===${NC}"
+echo
+echo -e "${YELLOW}Thông tin quan trọng:${NC}"
+echo "- MariaDB Root Password: webest@2024"
+echo "- Các port đã mở: 22 (SSH), 80 (HTTP), 443 (HTTPS)"
+echo "- Thư mục web mặc định: /var/www"
+echo "- Thư mục cấu hình: $CONFIG_DIR"
+echo "- Thư mục logs: $LOG_DIR"
+echo
+echo -e "${GREEN}Bạn có thể truy cập IP server để xem trang chào mừng${NC}"
+echo -e "${GREEN}Sử dụng lệnh 'webestvps' để quản lý server${NC}"
+echo
+
+# Hiển thị IP của server
+echo -e "${YELLOW}IP của server:${NC}"
+ip addr show | grep -w inet | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1 
