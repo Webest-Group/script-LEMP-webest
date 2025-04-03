@@ -39,8 +39,131 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
+# Function kiểm tra và sửa lỗi apt
+fix_apt() {
+    log "Đang kiểm tra và sửa lỗi apt..."
+    
+    # Xóa lock files nếu có
+    rm -f /var/lib/apt/lists/lock
+    rm -f /var/cache/apt/archives/lock
+    rm -f /var/lib/dpkg/lock*
+    
+    # Sửa lỗi dpkg
+    dpkg --configure -a
+    
+    # Xóa cache và cập nhật
+    apt clean
+    apt update
+    
+    # Sửa các gói bị hỏng
+    apt --fix-broken install -y
+    
+    # Cài đặt lại các gói cơ bản
+    apt install --reinstall -y ubuntu-advantage-tools
+    apt install --reinstall -y python3-software-properties software-properties-common
+    
+    log "Đã sửa xong lỗi apt"
+}
+
+# Function kiểm tra và sửa lỗi repository
+fix_repository() {
+    log "Đang kiểm tra và sửa lỗi repository..."
+    
+    # Backup sources.list
+    cp /etc/apt/sources.list /etc/apt/sources.list.backup
+    
+    # Tạo sources.list mới
+    cat > /etc/apt/sources.list << EOF
+deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse
+EOF
+    
+    # Cập nhật lại
+    apt update
+    
+    log "Đã sửa xong repository"
+}
+
+# Function kiểm tra và sửa lỗi network
+fix_network() {
+    log "Đang kiểm tra và sửa lỗi network..."
+    
+    # Kiểm tra kết nối internet
+    if ! ping -c 1 8.8.8.8 &> /dev/null; then
+        log "Không thể kết nối internet. Đang thử sửa..."
+        
+        # Kiểm tra và khởi động lại network
+        systemctl restart systemd-networkd
+        systemctl restart systemd-resolved
+        
+        # Đợi network khởi động
+        sleep 5
+    fi
+    
+    # Kiểm tra DNS
+    if ! ping -c 1 google.com &> /dev/null; then
+        log "Lỗi DNS. Đang sửa..."
+        echo "nameserver 8.8.8.8" > /etc/resolv.conf
+        echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+    fi
+    
+    log "Đã sửa xong network"
+}
+
+# Function cài đặt lại service với retry
+reinstall_service_with_retry() {
+    local service_name="$1"
+    local max_retries=3
+    local retry_count=0
+    
+    while [ $retry_count -lt $max_retries ]; do
+        log "Đang cài đặt lại $service_name (lần $((retry_count + 1)))..."
+        
+        case $service_name in
+            "nginx")
+                apt remove -y nginx nginx-common
+                apt autoremove -y
+                apt install -y nginx
+                ;;
+            "php")
+                apt install --reinstall -y php8.1-fpm
+                ;;
+            "mariadb")
+                apt install --reinstall -y mariadb-server
+                ;;
+            "redis")
+                apt install --reinstall -y redis-server redis-tools
+                ;;
+        esac
+        
+        if [ $? -eq 0 ]; then
+            systemctl enable "$service_name"
+            systemctl start "$service_name"
+            
+            if systemctl is-active --quiet "$service_name"; then
+                log "$service_name đã được cài đặt và khởi động thành công"
+                return 0
+            fi
+        fi
+        
+        retry_count=$((retry_count + 1))
+        log "Cài đặt $service_name thất bại, đợi 5 giây trước khi thử lại..."
+        sleep 5
+    done
+    
+    log "Lỗi: Không thể cài đặt $service_name sau $max_retries lần thử"
+    return 1
+}
+
 echo -e "${GREEN}=== BẮT ĐẦU CÀI ĐẶT WEBEST VPS PANEL ===${NC}"
 echo
+
+# Thêm vào trước phần cập nhật hệ thống
+fix_network
+fix_apt
+fix_repository
 
 # Sửa lỗi dpkg bị gián đoạn
 log "Kiểm tra và sửa lỗi dpkg..."
@@ -53,17 +176,15 @@ apt upgrade -y
 
 # 1. Cài đặt Nginx
 log "Đang cài đặt Nginx..."
-apt install -y nginx
-systemctl enable nginx
-systemctl start nginx
+reinstall_service_with_retry "nginx"
 
 # 2. Cài đặt PHP và các extension
 log "Đang cài đặt PHP và các extension..."
-apt install -y software-properties-common
 LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
 apt update
 apt install -y php8.1-fpm php8.1-cli php8.1-common php8.1-mysql php8.1-zip \
     php8.1-gd php8.1-mbstring php8.1-curl php8.1-xml php8.1-bcmath php8.1-intl
+reinstall_service_with_retry "php"
 
 # Cấu hình PHP
 PHP_INI="/etc/php/8.1/fpm/php.ini"
@@ -80,7 +201,7 @@ systemctl restart php8.1-fpm
 
 # 3. Cài đặt MariaDB
 log "Đang cài đặt MariaDB..."
-apt install -y mariadb-server mariadb-client
+reinstall_service_with_retry "mariadb"
 
 # Đảm bảo MariaDB đang chạy
 systemctl enable mariadb
@@ -96,9 +217,7 @@ mysql -e "FLUSH PRIVILEGES"
 
 # 4. Cài đặt Redis
 log "Đang cài đặt Redis..."
-apt install -y redis-server php8.1-redis
-systemctl enable redis-server
-systemctl start redis-server
+reinstall_service_with_retry "redis"
 
 # 5. Cài đặt Composer
 log "Đang cài đặt Composer..."
