@@ -33,7 +33,7 @@ cd "$INSTALL_DIR" || exit
 echo -e "${GREEN}Đang tải các module...${NC}"
 
 # URL của repository (thay thế bằng URL thực tế của bạn)
-REPO_URL="https://raw.githubusercontent.com/yourusername/server-setup/main"
+REPO_URL="https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main"
 
 # Tải các module
 modules=(
