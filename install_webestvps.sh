@@ -15,13 +15,14 @@ fi
 echo -e "${GREEN}=== CÀI ĐẶT WEBEST VPS PANEL ===${NC}"
 echo
 
-# Thiết lập các thư mục
+# Các đường dẫn
 INSTALL_DIR="/opt/webestvps"
 CONFIG_DIR="/etc/webestvps"
 LOG_DIR="/var/log/webestvps"
+WEB_ROOT="/home/websites"
 
 # Tạo các thư mục cần thiết
-mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR"
+mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR" "$WEB_ROOT"
 
 # Sao chép các file script từ thư mục hiện tại
 cp laravel_install.sh "$INSTALL_DIR/"

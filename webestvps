@@ -13,301 +13,630 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Các biến môi trường
-REPO_URL="https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main"
+# Các đường dẫn
 INSTALL_DIR="/opt/webestvps"
 CONFIG_DIR="/etc/webestvps"
 LOG_DIR="/var/log/webestvps"
-VERSION="1.0.0"
+WEB_ROOT="/home/websites"
 
-# Tạo các thư mục cần thiết
-mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR"
-
-# Kiểm tra xem đã cài đặt chưa
-if [ ! -f "$CONFIG_DIR/installed" ]; then
-    echo -e "${YELLOW}WebEST VPS Panel chưa được cài đặt.${NC}"
-    echo -e "${GREEN}Đang cài đặt...${NC}"
-    
-    # Tải về setup.sh
-    curl -sSL "$REPO_URL/setup.sh" -o "$INSTALL_DIR/setup.sh"
-    chmod +x "$INSTALL_DIR/setup.sh"
-    
-    # Tạo file đánh dấu đã cài đặt
-    touch "$CONFIG_DIR/installed"
-    echo "$VERSION" > "$CONFIG_DIR/version"
-    
-    # Thực hiện cài đặt
-    cd "$INSTALL_DIR" || exit
-    bash setup.sh
-    exit 0
-fi
-
-# Kiểm tra các cập nhật
-check_update() {
-    echo -e "${BLUE}Đang kiểm tra cập nhật...${NC}"
-    
-    # Tải về phiên bản mới nhất
-    CURRENT_VERSION=$(cat "$CONFIG_DIR/version")
-    LATEST_VERSION=$(curl -sSL "$REPO_URL/version.txt" 2>/dev/null || echo "$CURRENT_VERSION")
-    
-    if [ "$LATEST_VERSION" != "$CURRENT_VERSION" ]; then
-        echo -e "${GREEN}Phát hiện phiên bản mới: $LATEST_VERSION (Phiên bản hiện tại: $CURRENT_VERSION)${NC}"
-        echo -e "${YELLOW}Bạn có muốn cập nhật ngay không? (y/n)${NC}"
-        read -r answer
-        if [[ "$answer" =~ ^[Yy]$ ]]; then
-            echo -e "${GREEN}Đang cập nhật...${NC}"
-            
-            # Tải lại setup.sh
-            curl -sSL "$REPO_URL/setup.sh" -o "$INSTALL_DIR/setup.sh"
-            chmod +x "$INSTALL_DIR/setup.sh"
-            
-            # Cập nhật version
-            echo "$LATEST_VERSION" > "$CONFIG_DIR/version"
-            
-            echo -e "${GREEN}Cập nhật hoàn tất!${NC}"
-        else
-            echo -e "${YELLOW}Đã hủy cập nhật.${NC}"
-        fi
-    else
-        echo -e "${GREEN}Bạn đang sử dụng phiên bản mới nhất!${NC}"
-    fi
+# Function hiển thị menu
+show_menu() {
+    clear
+    echo -e "${GREEN}=== WEBEST VPS PANEL ===${NC}"
+    echo
+    echo -e "${YELLOW}1.${NC} Quản lý Domain"
+    echo -e "${YELLOW}2.${NC} Quản lý SSL"
+    echo -e "${YELLOW}3.${NC} Quản lý Database"
+    echo -e "${YELLOW}4.${NC} Quản lý Backup"
+    echo -e "${YELLOW}5.${NC} Quản lý Service"
+    echo -e "${YELLOW}6.${NC} Cài đặt Laravel"
+    echo -e "${YELLOW}7.${NC} Thông tin Server"
+    echo -e "${YELLOW}8.${NC} Cập nhật Panel"
+    echo -e "${YELLOW}0.${NC} Thoát"
+    echo
+    read -p "Nhập lựa chọn của bạn: " choice
 }
 
-# Hàm cài đặt Laravel
-install_laravel() {
-    echo -e "${BLUE}Bắt đầu cài đặt Laravel Stack...${NC}"
-    
-    # Tải script cài đặt Laravel
-    curl -sSL "$REPO_URL/laravel_install.sh" -o "$INSTALL_DIR/laravel_install.sh"
-    chmod +x "$INSTALL_DIR/laravel_install.sh"
-    
-    # Thực hiện cài đặt
-    bash "$INSTALL_DIR/laravel_install.sh"
-}
-
-# Hàm tạo site Laravel mới
-create_laravel_site() {
+# Function quản lý domain
+manage_domain() {
+    clear
+    echo -e "${GREEN}=== QUẢN LÝ DOMAIN ===${NC}"
     echo
-    echo -e "${BLUE}=== TẠO SITE LARAVEL MỚI ===${NC}"
+    echo -e "${YELLOW}1.${NC} Thêm domain mới"
+    echo -e "${YELLOW}2.${NC} Xóa domain"
+    echo -e "${YELLOW}3.${NC} Danh sách domain"
+    echo -e "${YELLOW}0.${NC} Quay lại"
     echo
+    read -p "Nhập lựa chọn của bạn: " domain_choice
     
-    # Nhập thông tin domain
-    echo -n "Nhập tên miền (VD: example.com): "
-    read -r domain
-    
-    # Kiểm tra xem domain đã tồn tại chưa
-    if [ -f "/etc/nginx/sites-available/$domain" ]; then
-        echo -e "${RED}Domain này đã tồn tại!${NC}"
-        return 1
-    fi
-    
-    # Nhập đường dẫn web root
-    echo -n "Nhập đường dẫn web root (mặc định: /var/www/$domain): "
-    read -r web_root
-    web_root=${web_root:-/var/www/$domain}
-    
-    # Nhập phiên bản Laravel
-    echo -n "Phiên bản Laravel (để trống cho phiên bản mới nhất): "
-    read -r laravel_version
-    
-    # Tạo database
-    echo -n "Tạo database mới? (y/n): "
-    read -r create_db
-    
-    if [[ "$create_db" =~ ^[Yy]$ ]]; then
-        # Tên database
-        db_name=$(echo "$domain" | sed 's/\./_/g')
-        
-        # Tạo tên user và mật khẩu ngẫu nhiên
-        db_user=$(echo "$domain" | sed 's/\./_/g' | cut -c 1-16)
-        db_pass=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9')
-        
-        # Tạo database và user
-        mysql -e "CREATE DATABASE IF NOT EXISTS \`$db_name\`;"
-        mysql -e "CREATE USER IF NOT EXISTS '$db_user'@'localhost' IDENTIFIED BY '$db_pass';"
-        mysql -e "GRANT ALL PRIVILEGES ON \`$db_name\`.* TO '$db_user'@'localhost';"
-        mysql -e "FLUSH PRIVILEGES;"
-        
-        echo -e "${GREEN}Database đã được tạo:${NC}"
-        echo "- Tên database: $db_name"
-        echo "- User: $db_user"
-        echo "- Password: $db_pass"
-    fi
-    
-    # Tạo thư mục web root
-    mkdir -p "$web_root"
-    
-    # Clone Laravel
-    cd "$web_root" || exit
-    if [ -z "$laravel_version" ]; then
-        composer create-project --prefer-dist laravel/laravel .
-    else
-        composer create-project --prefer-dist laravel/laravel:$laravel_version .
-    fi
-    
-    # Sửa quyền
-    chown -R www-data:www-data "$web_root"
-    chmod -R 755 "$web_root"
-    
-    # Cấu hình .env nếu đã tạo database
-    if [[ "$create_db" =~ ^[Yy]$ ]]; then
-        sed -i "s/DB_DATABASE=laravel/DB_DATABASE=$db_name/g" .env
-        sed -i "s/DB_USERNAME=root/DB_USERNAME=$db_user/g" .env
-        sed -i "s/DB_PASSWORD=/DB_PASSWORD=$db_pass/g" .env
-    fi
-    
-    # Tạo cấu hình Nginx
-    cat > "/etc/nginx/sites-available/$domain" << EOF
+    case $domain_choice in
+        1)
+            read -p "Nhập tên domain: " domain
+            if [ -z "$domain" ]; then
+                echo -e "${RED}Domain không được để trống${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            
+            # Tạo thư mục cho domain
+            mkdir -p "$WEB_ROOT/$domain"
+            chown -R www-data:www-data "$WEB_ROOT/$domain"
+            
+            # Tạo cấu hình Nginx
+            cat > "/etc/nginx/sites-available/$domain" << EOF
 server {
     listen 80;
     listen [::]:80;
     server_name $domain www.$domain;
-    root $web_root/public;
-
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
-
-    index index.php;
-
-    charset utf-8;
-
+    
+    root $WEB_ROOT/$domain;
+    index index.php index.html index.htm;
+    
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
-
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location = /robots.txt  { access_log off; log_not_found off; }
-
-    error_page 404 /index.php;
-
+    
     location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
-        include fastcgi_params;
     }
-
-    location ~ /\.(?!well-known).* {
+    
+    location ~ /\.ht {
         deny all;
     }
 }
 EOF
-    
-    # Kích hoạt cấu hình và khởi động lại Nginx
-    ln -s "/etc/nginx/sites-available/$domain" "/etc/nginx/sites-enabled/"
-    nginx -t && systemctl restart nginx
-    
-    # Cài đặt SSL
-    echo -n "Cài đặt SSL cho domain này? (y/n): "
-    read -r install_ssl
-    
-    if [[ "$install_ssl" =~ ^[Yy]$ ]]; then
-        certbot --nginx -d "$domain" -d "www.$domain"
-    fi
-    
-    echo -e "${GREEN}Site Laravel đã được tạo thành công tại $web_root${NC}"
-}
-
-# Menu chính
-show_menu() {
-    clear
-    echo -e "${GREEN}===============================================${NC}"
-    echo -e "${GREEN}             WEBEST VPS PANEL                 ${NC}"
-    echo -e "${GREEN}===============================================${NC}"
-    echo -e "Phiên bản: $(cat "$CONFIG_DIR/version")"
-    echo
-    echo -e "${YELLOW}MENU CHÍNH:${NC}"
-    echo "1) Chạy cài đặt LEMP Stack đầy đủ"
-    echo "2) Cài đặt Laravel Stack (Nginx + PHP + MariaDB + Redis + Composer)"
-    echo "3) Tạo site Laravel mới"
-    echo "4) Quản lý domain"
-    echo "5) Quản lý SSL"
-    echo "6) Quản lý Database"
-    echo "7) Quản lý backup"
-    echo "8) Kiểm tra và cài đặt cập nhật"
-    echo "9) Xem logs hệ thống"
-    echo "0) Thoát"
-    echo
-    echo -n "Nhập lựa chọn của bạn [0-9]: "
-}
-
-# Main script
-while true; do
-    show_menu
-    read -r choice
-    
-    case $choice in
-        1)
-            cd "$INSTALL_DIR" || exit
-            bash setup.sh
+            
+            # Tạo symbolic link
+            ln -sf "/etc/nginx/sites-available/$domain" "/etc/nginx/sites-enabled/"
+            
+            # Kiểm tra cấu hình Nginx
+            nginx -t
+            
+            if [ $? -eq 0 ]; then
+                systemctl reload nginx
+                echo -e "${GREEN}Domain $domain đã được thêm thành công${NC}"
+            else
+                echo -e "${RED}Lỗi cấu hình Nginx${NC}"
+                rm -f "/etc/nginx/sites-enabled/$domain"
+            fi
             ;;
         2)
-            install_laravel
+            read -p "Nhập tên domain cần xóa: " domain
+            if [ -z "$domain" ]; then
+                echo -e "${RED}Domain không được để trống${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            
+            # Xóa cấu hình Nginx
+            rm -f "/etc/nginx/sites-enabled/$domain"
+            rm -f "/etc/nginx/sites-available/$domain"
+            
+            # Xóa thư mục web
+            rm -rf "$WEB_ROOT/$domain"
+            
+            # Reload Nginx
+            systemctl reload nginx
+            
+            echo -e "${GREEN}Domain $domain đã được xóa thành công${NC}"
             ;;
         3)
-            create_laravel_site
+            echo -e "${GREEN}Danh sách domain:${NC}"
+            ls -1 "$WEB_ROOT" | grep -v "default"
             ;;
-        4)
-            if [ -f "$INSTALL_DIR/modules/domain.sh" ]; then
-                cd "$INSTALL_DIR" || exit
-                bash "$INSTALL_DIR/modules/domain.sh"
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}Lựa chọn không hợp lệ${NC}"
+            ;;
+    esac
+    
+    read -p "Nhấn Enter để tiếp tục..."
+}
+
+# Function quản lý SSL
+manage_ssl() {
+    clear
+    echo -e "${GREEN}=== QUẢN LÝ SSL ===${NC}"
+    echo
+    echo -e "${YELLOW}1.${NC} Cài đặt SSL cho domain"
+    echo -e "${YELLOW}2.${NC} Gia hạn SSL"
+    echo -e "${YELLOW}3.${NC} Xóa SSL"
+    echo -e "${YELLOW}0.${NC} Quay lại"
+    echo
+    read -p "Nhập lựa chọn của bạn: " ssl_choice
+    
+    case $ssl_choice in
+        1)
+            read -p "Nhập tên domain: " domain
+            if [ -z "$domain" ]; then
+                echo -e "${RED}Domain không được để trống${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            
+            # Cài đặt SSL
+            certbot --nginx -d "$domain" -d "www.$domain" --non-interactive --agree-tos --email admin@$domain
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}SSL đã được cài đặt thành công cho domain $domain${NC}"
             else
-                echo -e "${RED}Module quản lý domain chưa được cài đặt.${NC}"
-                sleep 2
+                echo -e "${RED}Lỗi khi cài đặt SSL${NC}"
             fi
             ;;
-        5)
-            if [ -f "$INSTALL_DIR/modules/ssl.sh" ]; then
-                cd "$INSTALL_DIR" || exit
-                bash "$INSTALL_DIR/modules/ssl.sh"
+        2)
+            # Gia hạn tất cả SSL
+            certbot renew --dry-run
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}SSL đã được gia hạn thành công${NC}"
             else
-                echo -e "${RED}Module quản lý SSL chưa được cài đặt.${NC}"
-                sleep 2
+                echo -e "${RED}Lỗi khi gia hạn SSL${NC}"
             fi
             ;;
-        6)
-            if [ -f "$INSTALL_DIR/modules/database.sh" ]; then
-                cd "$INSTALL_DIR" || exit
-                bash "$INSTALL_DIR/modules/database.sh"
-            else
-                echo -e "${RED}Module quản lý database chưa được cài đặt.${NC}"
-                sleep 2
+        3)
+            read -p "Nhập tên domain: " domain
+            if [ -z "$domain" ]; then
+                echo -e "${RED}Domain không được để trống${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
             fi
-            ;;
-        7)
-            if [ -f "$INSTALL_DIR/modules/backup.sh" ]; then
-                cd "$INSTALL_DIR" || exit
-                bash "$INSTALL_DIR/modules/backup.sh"
+            
+            # Xóa SSL
+            certbot delete --cert-name "$domain"
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}SSL đã được xóa thành công cho domain $domain${NC}"
             else
-                echo -e "${RED}Module quản lý backup chưa được cài đặt.${NC}"
-                sleep 2
-            fi
-            ;;
-        8)
-            check_update
-            ;;
-        9)
-            if [ -d "$LOG_DIR" ]; then
-                ls -la "$LOG_DIR"
-                echo -n "Nhập tên file log để xem (hoặc nhấn Enter để quay lại): "
-                read -r logfile
-                if [ -n "$logfile" ] && [ -f "$LOG_DIR/$logfile" ]; then
-                    less "$LOG_DIR/$logfile"
-                fi
-            else
-                echo -e "${RED}Thư mục log không tồn tại.${NC}"
-                sleep 2
+                echo -e "${RED}Lỗi khi xóa SSL${NC}"
             fi
             ;;
         0)
-            echo -e "${GREEN}Cảm ơn bạn đã sử dụng WebEST VPS Panel!${NC}"
+            return
+            ;;
+        *)
+            echo -e "${RED}Lựa chọn không hợp lệ${NC}"
+            ;;
+    esac
+    
+    read -p "Nhấn Enter để tiếp tục..."
+}
+
+# Function quản lý database
+manage_database() {
+    clear
+    echo -e "${GREEN}=== QUẢN LÝ DATABASE ===${NC}"
+    echo
+    echo -e "${YELLOW}1.${NC} Tạo database mới"
+    echo -e "${YELLOW}2.${NC} Xóa database"
+    echo -e "${YELLOW}3.${NC} Tạo user mới"
+    echo -e "${YELLOW}4.${NC} Xóa user"
+    echo -e "${YELLOW}5.${NC} Danh sách database"
+    echo -e "${YELLOW}0.${NC} Quay lại"
+    echo
+    read -p "Nhập lựa chọn của bạn: " db_choice
+    
+    case $db_choice in
+        1)
+            read -p "Nhập tên database: " dbname
+            if [ -z "$dbname" ]; then
+                echo -e "${RED}Tên database không được để trống${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            
+            # Tạo database
+            mysql -e "CREATE DATABASE IF NOT EXISTS \`$dbname\`;"
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Database $dbname đã được tạo thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi tạo database${NC}"
+            fi
+            ;;
+        2)
+            read -p "Nhập tên database cần xóa: " dbname
+            if [ -z "$dbname" ]; then
+                echo -e "${RED}Tên database không được để trống${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            
+            # Xóa database
+            mysql -e "DROP DATABASE IF EXISTS \`$dbname\`;"
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Database $dbname đã được xóa thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi xóa database${NC}"
+            fi
+            ;;
+        3)
+            read -p "Nhập tên user: " username
+            read -s -p "Nhập mật khẩu: " password
+            echo
+            
+            if [ -z "$username" ] || [ -z "$password" ]; then
+                echo -e "${RED}Username và password không được để trống${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            
+            # Tạo user
+            mysql -e "CREATE USER '$username'@'localhost' IDENTIFIED BY '$password';"
+            mysql -e "GRANT ALL PRIVILEGES ON *.* TO '$username'@'localhost';"
+            mysql -e "FLUSH PRIVILEGES;"
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}User $username đã được tạo thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi tạo user${NC}"
+            fi
+            ;;
+        4)
+            read -p "Nhập tên user cần xóa: " username
+            if [ -z "$username" ]; then
+                echo -e "${RED}Tên user không được để trống${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            
+            # Xóa user
+            mysql -e "DROP USER '$username'@'localhost';"
+            mysql -e "FLUSH PRIVILEGES;"
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}User $username đã được xóa thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi xóa user${NC}"
+            fi
+            ;;
+        5)
+            echo -e "${GREEN}Danh sách database:${NC}"
+            mysql -e "SHOW DATABASES;" | grep -v "Database\|information_schema\|performance_schema\|mysql"
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}Lựa chọn không hợp lệ${NC}"
+            ;;
+    esac
+    
+    read -p "Nhấn Enter để tiếp tục..."
+}
+
+# Function quản lý backup
+manage_backup() {
+    clear
+    echo -e "${GREEN}=== QUẢN LÝ BACKUP ===${NC}"
+    echo
+    echo -e "${YELLOW}1.${NC} Backup toàn bộ website"
+    echo -e "${YELLOW}2.${NC} Backup database"
+    echo -e "${YELLOW}3.${NC} Khôi phục website"
+    echo -e "${YELLOW}4.${NC} Khôi phục database"
+    echo -e "${YELLOW}0.${NC} Quay lại"
+    echo
+    read -p "Nhập lựa chọn của bạn: " backup_choice
+    
+    case $backup_choice in
+        1)
+            # Tạo thư mục backup
+            backup_dir="/root/backups/websites/$(date +%Y%m%d_%H%M%S)"
+            mkdir -p "$backup_dir"
+            
+            # Backup toàn bộ website
+            tar -czf "$backup_dir/websites.tar.gz" -C "$WEB_ROOT" .
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Backup website đã được tạo tại $backup_dir/websites.tar.gz${NC}"
+            else
+                echo -e "${RED}Lỗi khi tạo backup website${NC}"
+            fi
+            ;;
+        2)
+            # Tạo thư mục backup
+            backup_dir="/root/backups/databases/$(date +%Y%m%d_%H%M%S)"
+            mkdir -p "$backup_dir"
+            
+            # Backup toàn bộ database
+            mysqldump --all-databases > "$backup_dir/all_databases.sql"
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Backup database đã được tạo tại $backup_dir/all_databases.sql${NC}"
+            else
+                echo -e "${RED}Lỗi khi tạo backup database${NC}"
+            fi
+            ;;
+        3)
+            read -p "Nhập đường dẫn file backup: " backup_file
+            if [ -z "$backup_file" ] || [ ! -f "$backup_file" ]; then
+                echo -e "${RED}File backup không tồn tại${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            
+            # Khôi phục website
+            tar -xzf "$backup_file" -C "$WEB_ROOT"
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Website đã được khôi phục thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi khôi phục website${NC}"
+            fi
+            ;;
+        4)
+            read -p "Nhập đường dẫn file backup: " backup_file
+            if [ -z "$backup_file" ] || [ ! -f "$backup_file" ]; then
+                echo -e "${RED}File backup không tồn tại${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            
+            # Khôi phục database
+            mysql < "$backup_file"
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Database đã được khôi phục thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi khôi phục database${NC}"
+            fi
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}Lựa chọn không hợp lệ${NC}"
+            ;;
+    esac
+    
+    read -p "Nhấn Enter để tiếp tục..."
+}
+
+# Function quản lý service
+manage_service() {
+    clear
+    echo -e "${GREEN}=== QUẢN LÝ SERVICE ===${NC}"
+    echo
+    echo -e "${YELLOW}1.${NC} Khởi động lại Nginx"
+    echo -e "${YELLOW}2.${NC} Khởi động lại PHP-FPM"
+    echo -e "${YELLOW}3.${NC} Khởi động lại MariaDB"
+    echo -e "${YELLOW}4.${NC} Khởi động lại Redis"
+    echo -e "${YELLOW}5.${NC} Trạng thái các service"
+    echo -e "${YELLOW}0.${NC} Quay lại"
+    echo
+    read -p "Nhập lựa chọn của bạn: " service_choice
+    
+    case $service_choice in
+        1)
+            systemctl restart nginx
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Nginx đã được khởi động lại thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi khởi động lại Nginx${NC}"
+            fi
+            ;;
+        2)
+            systemctl restart php8.1-fpm
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}PHP-FPM đã được khởi động lại thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi khởi động lại PHP-FPM${NC}"
+            fi
+            ;;
+        3)
+            systemctl restart mariadb
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}MariaDB đã được khởi động lại thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi khởi động lại MariaDB${NC}"
+            fi
+            ;;
+        4)
+            systemctl restart redis-server
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Redis đã được khởi động lại thành công${NC}"
+            else
+                echo -e "${RED}Lỗi khi khởi động lại Redis${NC}"
+            fi
+            ;;
+        5)
+            echo -e "${GREEN}Trạng thái các service:${NC}"
+            echo
+            echo -e "${YELLOW}Nginx:${NC}"
+            systemctl status nginx | grep "Active:"
+            echo
+            echo -e "${YELLOW}PHP-FPM:${NC}"
+            systemctl status php8.1-fpm | grep "Active:"
+            echo
+            echo -e "${YELLOW}MariaDB:${NC}"
+            systemctl status mariadb | grep "Active:"
+            echo
+            echo -e "${YELLOW}Redis:${NC}"
+            systemctl status redis-server | grep "Active:"
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}Lựa chọn không hợp lệ${NC}"
+            ;;
+    esac
+    
+    read -p "Nhấn Enter để tiếp tục..."
+}
+
+# Function cài đặt Laravel
+install_laravel() {
+    clear
+    echo -e "${GREEN}=== CÀI ĐẶT LARAVEL ===${NC}"
+    echo
+    read -p "Nhập tên domain: " domain
+    if [ -z "$domain" ]; then
+        echo -e "${RED}Domain không được để trống${NC}"
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+    
+    # Tạo thư mục cho Laravel
+    mkdir -p "$WEB_ROOT/$domain"
+    cd "$WEB_ROOT/$domain"
+    
+    # Cài đặt Laravel
+    composer create-project laravel/laravel .
+    
+    if [ $? -eq 0 ]; then
+        # Phân quyền
+        chown -R www-data:www-data .
+        chmod -R 755 .
+        chmod -R 777 storage bootstrap/cache
+        
+        # Tạo database
+        read -p "Nhập tên database: " dbname
+        read -p "Nhập username database: " dbuser
+        read -s -p "Nhập password database: " dbpass
+        echo
+        
+        mysql -e "CREATE DATABASE IF NOT EXISTS \`$dbname\`;"
+        mysql -e "CREATE USER IF NOT EXISTS '$dbuser'@'localhost' IDENTIFIED BY '$dbpass';"
+        mysql -e "GRANT ALL PRIVILEGES ON \`$dbname\`.* TO '$dbuser'@'localhost';"
+        mysql -e "FLUSH PRIVILEGES;"
+        
+        # Cấu hình .env
+        sed -i "s/DB_DATABASE=laravel/DB_DATABASE=$dbname/" .env
+        sed -i "s/DB_USERNAME=root/DB_USERNAME=$dbuser/" .env
+        sed -i "s/DB_PASSWORD=/DB_PASSWORD=$dbpass/" .env
+        
+        # Tạo key
+        php artisan key:generate
+        
+        # Chạy migration
+        php artisan migrate
+        
+        echo -e "${GREEN}Laravel đã được cài đặt thành công tại domain $domain${NC}"
+    else
+        echo -e "${RED}Lỗi khi cài đặt Laravel${NC}"
+    fi
+    
+    read -p "Nhấn Enter để tiếp tục..."
+}
+
+# Function hiển thị thông tin server
+show_server_info() {
+    clear
+    echo -e "${GREEN}=== THÔNG TIN SERVER ===${NC}"
+    echo
+    echo -e "${YELLOW}Thông tin hệ thống:${NC}"
+    echo "OS: $(lsb_release -d | cut -f2)"
+    echo "Kernel: $(uname -r)"
+    echo "CPU: $(grep "model name" /proc/cpuinfo | head -n1 | cut -d: -f2)"
+    echo "RAM: $(free -h | grep Mem | awk '{print $2}')"
+    echo "Disk: $(df -h / | tail -n1 | awk '{print $2}')"
+    echo
+    echo -e "${YELLOW}Thông tin network:${NC}"
+    echo "IP: $(ip addr show | grep -w inet | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1)"
+    echo
+    echo -e "${YELLOW}Thông tin các service:${NC}"
+    echo "Nginx: $(nginx -v 2>&1)"
+    echo "PHP: $(php -v | head -n1)"
+    echo "MariaDB: $(mysql --version)"
+    echo "Redis: $(redis-cli --version)"
+    echo "Composer: $(composer --version | head -n1)"
+    echo "Node.js: $(node -v)"
+    echo
+    echo -e "${YELLOW}Thông tin website:${NC}"
+    echo "Web root: $WEB_ROOT"
+    echo "Số lượng domain: $(ls -1 "$WEB_ROOT" | wc -l)"
+    echo "Số lượng SSL: $(certbot certificates | grep "Domains:" | wc -l)"
+    echo
+    echo -e "${YELLOW}Thông tin database:${NC}"
+    echo "Số lượng database: $(mysql -e "SHOW DATABASES;" | grep -v "Database\|information_schema\|performance_schema\|mysql" | wc -l)"
+    echo "Số lượng user: $(mysql -e "SELECT COUNT(*) FROM mysql.user;" | tail -n1)"
+    
+    read -p "Nhấn Enter để tiếp tục..."
+}
+
+# Function cập nhật panel
+update_panel() {
+    clear
+    echo -e "${GREEN}=== CẬP NHẬT PANEL ===${NC}"
+    echo
+    
+    # Kiểm tra phiên bản hiện tại
+    current_version=$(cat "$CONFIG_DIR/version")
+    echo -e "${YELLOW}Phiên bản hiện tại: $current_version${NC}"
+    
+    # Tải phiên bản mới
+    echo "Đang tải phiên bản mới..."
+    wget -q -O /tmp/webestvps_new.sh https://raw.githubusercontent.com/webestvps/script-lemp/main/setup.sh
+    
+    if [ $? -eq 0 ]; then
+        # Kiểm tra phiên bản mới
+        new_version=$(grep "version=" /tmp/webestvps_new.sh | cut -d'"' -f2)
+        
+        if [ "$new_version" != "$current_version" ]; then
+            echo -e "${GREEN}Đã tìm thấy phiên bản mới: $new_version${NC}"
+            read -p "Bạn có muốn cập nhật không? (y/n): " update_choice
+            
+            if [ "$update_choice" = "y" ]; then
+                # Cập nhật
+                mv /tmp/webestvps_new.sh "$INSTALL_DIR/setup.sh"
+                chmod +x "$INSTALL_DIR/setup.sh"
+                echo "$new_version" > "$CONFIG_DIR/version"
+                echo -e "${GREEN}Panel đã được cập nhật thành công${NC}"
+            else
+                rm /tmp/webestvps_new.sh
+                echo -e "${YELLOW}Đã hủy cập nhật${NC}"
+            fi
+        else
+            echo -e "${GREEN}Bạn đang sử dụng phiên bản mới nhất${NC}"
+            rm /tmp/webestvps_new.sh
+        fi
+    else
+        echo -e "${RED}Lỗi khi tải phiên bản mới${NC}"
+    fi
+    
+    read -p "Nhấn Enter để tiếp tục..."
+}
+
+# Vòng lặp chính
+while true; do
+    show_menu
+    
+    case $choice in
+        1)
+            manage_domain
+            ;;
+        2)
+            manage_ssl
+            ;;
+        3)
+            manage_database
+            ;;
+        4)
+            manage_backup
+            ;;
+        5)
+            manage_service
+            ;;
+        6)
+            install_laravel
+            ;;
+        7)
+            show_server_info
+            ;;
+        8)
+            update_panel
+            ;;
+        0)
+            echo -e "${GREEN}Cảm ơn bạn đã sử dụng WebEST VPS Panel${NC}"
             exit 0
             ;;
         *)
             echo -e "${RED}Lựa chọn không hợp lệ${NC}"
-            sleep 2
+            read -p "Nhấn Enter để tiếp tục..."
             ;;
     esac
-    
-    echo
-    read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
 done 
