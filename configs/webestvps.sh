@@ -101,62 +101,142 @@ backup() {
     log "Đã backup $domain thành công"
 }
 
-# Hàm cài đặt Laravel
-install_laravel() {
+# Hàm setup git hook
+setup_git_hook() {
     read -p "Nhập tên domain: " domain
     if [ -z "$domain" ]; then
         echo -e "${RED}Tên domain không được để trống${NC}"
         return 1
     fi
-    
-    # Cài đặt Composer
-    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-    
-    # Tạo project Laravel
-    composer create-project --prefer-dist laravel/laravel "$WEB_ROOT/$domain"
-    
-    # Cấu hình quyền
-    chown -R www-data:www-data "$WEB_ROOT/$domain"
-    chmod -R 755 "$WEB_ROOT/$domain"
-    
-    # Cấu hình Nginx
+
+    read -p "Nhập tên repository (user/repo): " repo
+    if [ -z "$repo" ]; then
+        echo -e "${RED}Tên repository không được để trống${NC}"
+        return 1
+    fi
+
+    read -p "Nhập tên branch (mặc định: main): " branch
+    branch=${branch:-main}
+
+    # Khoi tao git repository
+    cd "$WEB_ROOT/$domain"
+    git init
+    git remote add origin "https://github.com/$repo.git"
+    git fetch origin
+    git checkout -b $branch "origin/$branch"
+
+    # Tao file hook
+    cat > "$WEB_ROOT/$domain/webhook.php" << EOF
+<?php
+// Cau hinh
+\$secret = 'webestvps';
+\$domain = '$domain';
+\$branch = '$branch';
+\$web_root = '$WEB_ROOT';
+
+// Kiem tra secret
+\$headers = getallheaders();
+\$hub_signature = \$headers['X-Hub-Signature-256'] ?? '';
+
+if (empty(\$hub_signature)) {
+    http_response_code(401);
+    die('Missing signature');
+}
+
+// Lay payload
+\$payload = file_get_contents('php://input');
+\$payload_hash = 'sha256=' . hash_hmac('sha256', \$payload, \$secret);
+
+if (!hash_equals(\$hub_signature, \$payload_hash)) {
+    http_response_code(401);
+    die('Invalid signature');
+}
+
+// Xu ly payload
+\$data = json_decode(\$payload, true);
+if (!isset(\$data['ref'])) {
+    http_response_code(400);
+    die('Invalid payload');
+}
+
+// Kiem tra branch
+\$ref = \$data['ref'];
+\$push_branch = substr(\$ref, strrpos(\$ref, '/') + 1);
+
+if (\$push_branch !== \$branch) {
+    die('Ignoring push to ' . \$push_branch);
+}
+
+// Thuc hien git pull
+chdir(\$web_root . '/' . \$domain);
+exec('git fetch origin ' . \$branch . ' 2>&1', \$output, \$return_var);
+exec('git reset --hard origin/' . \$branch . ' 2>&1', \$output, \$return_var);
+
+if (\$return_var !== 0) {
+    http_response_code(500);
+    die('Git pull failed: ' . implode("\n", \$output));
+}
+
+// Cap nhat quyen
+exec('chown -R www-data:www-data .');
+exec('find . -type f -exec chmod 644 {} \\;');
+exec('find . -type d -exec chmod 755 {} \\;');
+
+// Khoi dong lai PHP-FPM
+exec('systemctl restart php8.1-fpm');
+
+echo 'Success';
+EOF
+
+    # Commit file webhook.php
+    git add webhook.php
+    git commit -m "Add webhook.php for auto deployment"
+    git push origin $branch
+
+    # Cap nhat cau hinh Nginx cho domain
     cat > "$NGINX_CONF/$domain" << EOF
 server {
     listen 80;
     server_name $domain www.$domain;
-    root $WEB_ROOT/$domain/public;
-    
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
-    
-    index index.php;
-    
-    charset utf-8;
+    root $WEB_ROOT/$domain;
+    index index.php index.html index.htm;
     
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
     
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location = /robots.txt  { access_log off; log_not_found off; }
-    
-    error_page 404 /index.php;
+    location /webhook.php {
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
+        
+        # Chi cho phep POST
+        if (\$request_method != POST) {
+            return 405;
+        }
+        
+        # Gioi han kich thuoc payload
+        client_max_body_size 1M;
+    }
     
     location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         include fastcgi_params;
     }
     
-    location ~ /\.(?!well-known).* {
+    location ~ /\.ht {
         deny all;
     }
 }
 EOF
-    
-    # Kích hoạt site
+
+    # Kich hoat site
     ln -sf "$NGINX_CONF/$domain" "$NGINX_ENABLED/"
     nginx -t && systemctl reload nginx
-    
-    log "Đã cài đặt Laravel cho $domain thành công"
+
+    log "Da setup git hook cho $domain thanh cong"
+    log "Webhook URL: http://$domain/webhook.php"
+    log "Secret: webestvps"
 } 

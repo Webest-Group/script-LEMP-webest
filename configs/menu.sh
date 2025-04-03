@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Menu chính
+# Menu chinh
 show_main_menu() {
     echo -e "\n${YELLOW}=== WebEST VPS Panel ===${NC}"
-    echo "1. Tạo domain"
-    echo "2. Cài đặt SSL"
-    echo "3. Tạo database"
+    echo "1. Tao domain"
+    echo "2. Cai dat SSL"
+    echo "3. Tao database"
     echo "4. Backup"
-    echo "5. Quản lý service"
-    echo "6. Cài đặt Laravel"
-    echo "7. Thoát"
+    echo "5. Quan ly service"
+    echo "6. Setup Git Hook"
+    echo "7. Thoat"
 }
 
 # Menu service
