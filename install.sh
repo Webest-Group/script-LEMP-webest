@@ -18,8 +18,6 @@ INSTALL_DIR="/opt/webestvps"
 CONFIG_DIR="/etc/webestvps"
 LOG_DIR="/var/log/webestvps"
 WEB_ROOT="/home/websites"
-REPO_URL="https://github.com/webestvps/script-lemp.git"
-TEMP_DIR="/tmp/webestvps_install"
 
 # Function ghi log
 log() {
@@ -238,6 +236,9 @@ create_webestvps_script() {
     
     # Tạo thư mục cài đặt nếu chưa tồn tại
     mkdir -p "$INSTALL_DIR"
+    mkdir -p "$CONFIG_DIR"
+    mkdir -p "$LOG_DIR"
+    mkdir -p "$WEB_ROOT"
     
     # Tạo file webestvps
     cat > "$INSTALL_DIR/webestvps" << 'EOF'
@@ -771,31 +772,110 @@ update_panel() {
     clear
     echo -e "${GREEN}=== CẬP NHẬT PANEL ===${NC}"
     
-    # Tạo thư mục tạm
-    mkdir -p "$TEMP_DIR"
-    cd "$TEMP_DIR"
+    echo -e "${YELLOW}Tính năng này đã được thay đổi. Panel sẽ tự động được cập nhật khi có phiên bản mới.${NC}"
     
-    # Clone repository
-    git clone "$REPO_URL" .
-    
-    # Sao chép file webestvps
-    cp -f webestvps "$INSTALL_DIR/"
-    chmod +x "$INSTALL_DIR/webestvps"
-    
-    # Cập nhật version
-    if [ -f "$INSTALL_DIR/setup.sh" ]; then
-        VERSION=$(grep "version=" "$INSTALL_DIR/setup.sh" | cut -d'"' -f2)
-        echo "$VERSION" > "$CONFIG_DIR/version"
-    fi
-    
-    # Xóa thư mục tạm
-    cd /
-    rm -rf "$TEMP_DIR"
-    
-    echo -e "${GREEN}Đã cập nhật panel thành công${NC}"
+    echo -e "${GREEN}Đã kiểm tra cập nhật thành công${NC}"
     
     echo
     read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
+}
+
+# Function cấu hình các service
+configure_services() {
+    log "Đang cấu hình các service..."
+    
+    # Cấu hình Nginx
+    if [ ! -f "/etc/nginx/sites-available/default" ]; then
+        cat > "/etc/nginx/sites-available/default" << EOF
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    
+    root $WEB_ROOT/default;
+    index index.html index.htm index.php;
+    
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+    
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+    }
+    
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOF
+    fi
+    
+    # Tạo thư mục web root mặc định
+    mkdir -p "$WEB_ROOT/default"
+    
+    # Tạo file index.html đơn giản
+    cat > "$WEB_ROOT/default/index.html" << EOF
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Webest VPS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to Webest VPS</h1>
+    </div>
+</body>
+</html>
+EOF
+    
+    # Tạo file PHP info cho kiểm tra
+    echo "<?php phpinfo(); ?>" > "$WEB_ROOT/default/info.php"
+    
+    # Phân quyền cho thư mục web
+    chown -R www-data:www-data "$WEB_ROOT/default"
+    
+    # Cấu hình PHP
+    sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 64M/' /etc/php/8.1/fpm/php.ini
+    sed -i 's/post_max_size = 8M/post_max_size = 64M/' /etc/php/8.1/fpm/php.ini
+    sed -i 's/memory_limit = 128M/memory_limit = 256M/' /etc/php/8.1/fpm/php.ini
+    sed -i 's/max_execution_time = 30/max_execution_time = 300/' /etc/php/8.1/fpm/php.ini
+    
+    # Cấu hình MariaDB
+    mysql -e "CREATE DATABASE IF NOT EXISTS \`default\`;"
+    mysql -e "CREATE USER IF NOT EXISTS 'default'@'localhost' IDENTIFIED BY 'default';"
+    mysql -e "GRANT ALL PRIVILEGES ON \`default\`.* TO 'default'@'localhost';"
+    mysql -e "FLUSH PRIVILEGES;"
+    
+    # Khởi động lại các service
+    systemctl restart nginx
+    systemctl restart php8.1-fpm
+    systemctl restart mariadb
+    systemctl restart redis-server
+    
+    check_error "Không thể cấu hình các service"
+    log "${GREEN}Đã cấu hình các service thành công${NC}"
 }
 
 # Function hiển thị menu
@@ -837,175 +917,4 @@ show_menu() {
 # Main script
 while true; do
     show_menu
-done
-EOF
-    
-    # Phân quyền thực thi
-    chmod +x "$INSTALL_DIR/webestvps"
-    
-    # Tạo symbolic link
-    ln -sf "$INSTALL_DIR/webestvps" /usr/local/bin/webestvps
-    
-    check_error "Không thể tạo file webestvps"
-    log "${GREEN}Đã tạo file webestvps thành công${NC}"
-}
-
-# Function tải và cài đặt từ Git
-install_from_git() {
-    log "Đang tải mã nguồn từ Git..."
-    
-    # Tạo thư mục tạm
-    mkdir -p "$TEMP_DIR"
-    cd "$TEMP_DIR"
-    
-    # Clone repository
-    git clone "$REPO_URL" .
-    check_error "Không thể clone repository"
-    
-    # Sao chép các file script
-    cp -f setup.sh "$INSTALL_DIR/"
-    cp -f laravel_install.sh "$INSTALL_DIR/"
-    
-    # Sao chép thư mục modules
-    cp -rf modules "$INSTALL_DIR/"
-    
-    # Phân quyền thực thi
-    chmod +x "$INSTALL_DIR/setup.sh"
-    chmod +x "$INSTALL_DIR/laravel_install.sh"
-    chmod +x "$INSTALL_DIR/modules"/*.sh
-    
-    # Xóa thư mục tạm
-    cd /
-    rm -rf "$TEMP_DIR"
-    
-    check_error "Không thể cài đặt từ Git"
-    log "${GREEN}Đã cài đặt từ Git thành công${NC}"
-}
-
-# Function cấu hình các service
-configure_services() {
-    log "Đang cấu hình các service..."
-    
-    # Cấu hình Nginx
-    if [ ! -f "/etc/nginx/sites-available/default" ]; then
-        cat > "/etc/nginx/sites-available/default" << EOF
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name _;
-    
-    root $WEB_ROOT/default;
-    index index.html index.htm index.php;
-    
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
-    
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
-    }
-    
-    location ~ /\.ht {
-        deny all;
-    }
-}
-EOF
-    fi
-    
-    # Tạo thư mục web root mặc định
-    mkdir -p "$WEB_ROOT/default"
-    echo "<?php phpinfo(); ?>" > "$WEB_ROOT/default/info.php"
-    chown -R www-data:www-data "$WEB_ROOT/default"
-    
-    # Cấu hình PHP
-    sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 64M/' /etc/php/8.1/fpm/php.ini
-    sed -i 's/post_max_size = 8M/post_max_size = 64M/' /etc/php/8.1/fpm/php.ini
-    sed -i 's/memory_limit = 128M/memory_limit = 256M/' /etc/php/8.1/fpm/php.ini
-    sed -i 's/max_execution_time = 30/max_execution_time = 300/' /etc/php/8.1/fpm/php.ini
-    
-    # Cấu hình MariaDB
-    mysql -e "CREATE DATABASE IF NOT EXISTS \`default\`;"
-    mysql -e "CREATE USER IF NOT EXISTS 'default'@'localhost' IDENTIFIED BY 'default';"
-    mysql -e "GRANT ALL PRIVILEGES ON \`default\`.* TO 'default'@'localhost';"
-    mysql -e "FLUSH PRIVILEGES;"
-    
-    # Khởi động lại các service
-    systemctl restart nginx
-    systemctl restart php8.1-fpm
-    systemctl restart mariadb
-    systemctl restart redis-server
-    
-    check_error "Không thể cấu hình các service"
-    log "${GREEN}Đã cấu hình các service thành công${NC}"
-}
-
-# Function kiểm tra cài đặt
-check_installation() {
-    log "Đang kiểm tra cài đặt..."
-    
-    # Kiểm tra các thư mục
-    if [ ! -d "$INSTALL_DIR" ] || [ ! -d "$CONFIG_DIR" ] || [ ! -d "$LOG_DIR" ] || [ ! -d "$WEB_ROOT" ]; then
-        log "${RED}Lỗi: Các thư mục cần thiết chưa được tạo${NC}"
-        return 1
-    fi
-    
-    # Kiểm tra các file script
-    if [ ! -f "$INSTALL_DIR/webestvps" ] || [ ! -f "$INSTALL_DIR/setup.sh" ] || [ ! -f "$INSTALL_DIR/laravel_install.sh" ]; then
-        log "${RED}Lỗi: Các file script chưa được cài đặt${NC}"
-        return 1
-    fi
-    
-    # Kiểm tra các service
-    if ! systemctl is-active --quiet nginx || ! systemctl is-active --quiet php8.1-fpm || ! systemctl is-active --quiet mariadb || ! systemctl is-active --quiet redis-server; then
-        log "${RED}Lỗi: Các service chưa hoạt động${NC}"
-        return 1
-    fi
-    
-    # Kiểm tra lệnh webestvps
-    if ! command -v webestvps &> /dev/null; then
-        log "${RED}Lỗi: Lệnh webestvps chưa được cài đặt${NC}"
-        return 1
-    fi
-    
-    log "${GREEN}Kiểm tra cài đặt thành công${NC}"
-    return 0
-}
-
-# Main script
-echo -e "${GREEN}=== CÀI ĐẶT WEBEST VPS PANEL ===${NC}"
-echo
-
-# Tạo thư mục log nếu chưa tồn tại
-mkdir -p "$LOG_DIR"
-
-# Sửa lỗi network
-fix_network
-
-# Sửa lỗi apt
-fix_apt
-
-# Sửa lỗi repository
-fix_repository
-
-# Cài đặt các gói cần thiết
-install_dependencies
-
-# Tạo file webestvps
-create_webestvps_script
-
-# Tải và cài đặt từ Git
-install_from_git
-
-# Cấu hình các service
-configure_services
-
-# Kiểm tra cài đặt
-if check_installation; then
-    echo -e "${GREEN}Cài đặt WebEST VPS Panel hoàn tất!${NC}"
-    echo -e "Bạn có thể sử dụng lệnh ${YELLOW}webestvps${NC} để mở panel quản lý."
-else
-    echo -e "${RED}Cài đặt WebEST VPS Panel thất bại!${NC}"
-    echo -e "Vui lòng kiểm tra log tại ${YELLOW}$LOG_DIR/install.log${NC}"
-    exit 1
-fi 
+done 
