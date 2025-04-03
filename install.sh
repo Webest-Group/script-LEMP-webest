@@ -786,7 +786,7 @@ configure_services() {
     
     # Cấu hình Nginx
     if [ ! -f "/etc/nginx/sites-available/default" ]; then
-        cat > "/etc/nginx/sites-available/default" << EOF
+        cat > "/etc/nginx/sites-available/default" << 'EOFNGINX'
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -796,7 +796,7 @@ server {
     index index.html index.htm index.php;
     
     location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
+        try_files $uri $uri/ /index.php?$query_string;
     }
     
     location ~ \.php$ {
@@ -808,7 +808,7 @@ server {
         deny all;
     }
 }
-EOF
+EOFNGINX
     fi
     
     # Tạo thư mục web root mặc định
