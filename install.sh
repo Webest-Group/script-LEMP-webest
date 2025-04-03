@@ -98,34 +98,74 @@ fix_network() {
     log "${GREEN}Đã sửa lỗi network thành công${NC}"
 }
 
+# Function kiểm tra gói đã cài đặt
+check_package() {
+    if dpkg -l "$1" &> /dev/null; then
+        log "${GREEN}Gói $1 đã được cài đặt${NC}"
+        return 0
+    else
+        log "${YELLOW}Gói $1 chưa được cài đặt${NC}"
+        return 1
+    fi
+}
+
 # Function cài đặt các gói cần thiết
 install_dependencies() {
-    log "Đang cài đặt các gói cần thiết..."
+    log "Đang kiểm tra và cài đặt các gói cần thiết..."
     
     # Cài đặt git và các công cụ cần thiết
-    apt update
-    apt install -y git curl wget unzip
+    for pkg in git curl wget unzip; do
+        if ! check_package "$pkg"; then
+            apt install -y "$pkg"
+            check_error "Không thể cài đặt gói $pkg"
+        fi
+    done
     
     # Cài đặt các gói cho LEMP stack
-    apt install -y nginx php8.1-fpm php8.1-cli php8.1-common php8.1-mysql \
+    for pkg in nginx php8.1-fpm php8.1-cli php8.1-common php8.1-mysql \
         php8.1-zip php8.1-gd php8.1-mbstring php8.1-curl php8.1-xml \
-        php8.1-bcmath php8.1-intl mariadb-server redis-server
+        php8.1-bcmath php8.1-intl mariadb-server redis-server; do
+        if ! check_package "$pkg"; then
+            apt install -y "$pkg"
+            check_error "Không thể cài đặt gói $pkg"
+        fi
+    done
     
-    # Cài đặt Composer
-    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    # Cài đặt Composer nếu chưa có
+    if ! command -v composer &> /dev/null; then
+        log "${YELLOW}Đang cài đặt Composer...${NC}"
+        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+        check_error "Không thể cài đặt Composer"
+    else
+        log "${GREEN}Composer đã được cài đặt${NC}"
+    fi
     
-    # Cài đặt Node.js và npm
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-    apt install -y nodejs
+    # Cài đặt Node.js và npm nếu chưa có
+    if ! command -v node &> /dev/null; then
+        log "${YELLOW}Đang cài đặt Node.js...${NC}"
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+        apt install -y nodejs
+        check_error "Không thể cài đặt Node.js"
+    else
+        log "${GREEN}Node.js đã được cài đặt${NC}"
+    fi
     
-    # Cài đặt Certbot
-    apt install -y certbot python3-certbot-nginx
+    # Cài đặt Certbot nếu chưa có
+    if ! command -v certbot &> /dev/null; then
+        log "${YELLOW}Đang cài đặt Certbot...${NC}"
+        apt install -y certbot python3-certbot-nginx
+        check_error "Không thể cài đặt Certbot"
+    else
+        log "${GREEN}Certbot đã được cài đặt${NC}"
+    fi
     
-    # Cài đặt Supervisor
-    apt install -y supervisor
+    # Cài đặt Supervisor nếu chưa có
+    if ! check_package "supervisor"; then
+        apt install -y supervisor
+        check_error "Không thể cài đặt Supervisor"
+    fi
     
-    check_error "Không thể cài đặt các gói cần thiết"
-    log "${GREEN}Đã cài đặt các gói cần thiết thành công${NC}"
+    log "${GREEN}Đã cài đặt tất cả các gói cần thiết thành công${NC}"
 }
 
 # Function tạo file webestvps
