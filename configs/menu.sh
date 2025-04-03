@@ -9,7 +9,8 @@ show_main_menu() {
     echo "4. Backup"
     echo "5. Quan ly service"
     echo "6. Setup Git Hook"
-    echo "7. Thoat"
+    echo "7. Cap nhat WebEST VPS"
+    echo "8. Thoat"
 }
 
 # Menu service

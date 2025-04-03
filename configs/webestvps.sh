@@ -239,4 +239,48 @@ EOF
     log "Da setup git hook cho $domain thanh cong"
     log "Webhook URL: http://$domain/webhook.php"
     log "Secret: webestvps"
+}
+
+# Ham update webestvps
+update_webestvps() {
+    # Tao thu muc tam
+    TMP_DIR=$(mktemp -d)
+    cd "$TMP_DIR"
+    
+    # Clone repository moi
+    git clone https://github.com/Webest-Group/script-LEMP-webest.git .
+    
+    # Kiem tra version moi
+    NEW_VERSION=$(cat install.sh | grep "VERSION=" | cut -d'"' -f2)
+    CURRENT_VERSION=$(cat /usr/local/bin/webestvps | grep "VERSION=" | cut -d'"' -f2)
+    
+    if [ "$NEW_VERSION" = "$CURRENT_VERSION" ]; then
+        echo -e "${GREEN}Ban dang su dung phien ban moi nhat: $CURRENT_VERSION${NC}"
+        rm -rf "$TMP_DIR"
+        return 0
+    fi
+    
+    echo -e "${YELLOW}Tim thay phien ban moi: $NEW_VERSION${NC}"
+    echo -e "${YELLOW}Phien ban hien tai: $CURRENT_VERSION${NC}"
+    
+    read -p "Ban co muon cap nhat khong? (y/n): " choice
+    if [ "$choice" != "y" ]; then
+        echo -e "${RED}Da huy cap nhat${NC}"
+        rm -rf "$TMP_DIR"
+        return 0
+    fi
+    
+    # Sao chep file moi
+    cp install.sh /usr/local/bin/webestvps
+    cp -r configs/* /usr/local/bin/configs/
+    
+    # Cap quyen thuc thi
+    chmod +x /usr/local/bin/webestvps
+    chmod +x /usr/local/bin/configs/*.sh
+    
+    # Xoa thu muc tam
+    rm -rf "$TMP_DIR"
+    
+    log "Da cap nhat WebEST VPS Panel len phien ban $NEW_VERSION"
+    log "Vui long khoi dong lai panel de ap dung thay doi"
 } 
