@@ -300,7 +300,7 @@ manage_domain() {
             chown -R www-data:www-data "$WEB_ROOT/$web_path"
             
             # Tạo cấu hình Nginx
-            cat > "/etc/nginx/sites-available/$domain" << EOF
+            cat > "/etc/nginx/sites-available/$domain" << 'EOFNGINX'
 server {
     listen 80;
     server_name $domain;
@@ -309,7 +309,7 @@ server {
     index index.html index.htm index.php;
     
     location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
+        try_files $uri $uri/ /index.php?$query_string;
     }
     
     location ~ \.php$ {
@@ -321,7 +321,7 @@ server {
         deny all;
     }
 }
-EOF
+EOFNGINX
             
             # Kích hoạt cấu hình
             ln -sf "/etc/nginx/sites-available/$domain" "/etc/nginx/sites-enabled/$domain"
