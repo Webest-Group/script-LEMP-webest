@@ -815,7 +815,7 @@ EOF
     mkdir -p "$WEB_ROOT/default"
     
     # Tạo file index.html đơn giản
-    cat > "$WEB_ROOT/default/index.html" << EOF
+    cat > "$WEB_ROOT/default/index.html" << 'EOF'
 <!DOCTYPE html>
 <html>
 <head>
