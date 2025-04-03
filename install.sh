@@ -19,6 +19,9 @@ CONFIG_DIR="/etc/webestvps"
 LOG_DIR="/var/log/webestvps"
 WEB_ROOT="/home/websites"
 
+# Phân biệt chế độ chạy
+INSTALL_MODE=true
+
 # Function ghi log
 log() {
     echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_DIR/install.log"
@@ -915,6 +918,40 @@ show_menu() {
 }
 
 # Main script
-while true; do
-    show_menu
-done 
+if [ "$INSTALL_MODE" = true ]; then
+    # Tạo thư mục log nếu chưa tồn tại
+    mkdir -p "$LOG_DIR"
+
+    # Sửa lỗi network
+    fix_network
+
+    # Sửa lỗi apt
+    fix_apt
+
+    # Sửa lỗi repository
+    fix_repository
+
+    # Cài đặt các gói cần thiết
+    install_dependencies
+
+    # Tạo file webestvps
+    create_webestvps_script
+
+    # Cấu hình các service
+    configure_services
+
+    # Kiểm tra cài đặt
+    if check_installation; then
+        echo -e "${GREEN}Cài đặt WebEST VPS Panel hoàn tất!${NC}"
+        echo -e "Bạn có thể sử dụng lệnh ${YELLOW}webestvps${NC} để mở panel quản lý."
+    else
+        echo -e "${RED}Cài đặt WebEST VPS Panel thất bại!${NC}"
+        echo -e "Vui lòng kiểm tra log tại ${YELLOW}$LOG_DIR/install.log${NC}"
+        exit 1
+    fi
+else
+    # Chế độ menu tương tác (chỉ chạy khi gọi thông qua lệnh webestvps)
+    while true; do
+        show_menu
+    done
+fi 
