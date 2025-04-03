@@ -1,192 +1,108 @@
-# Script Cài Đặt LEMP Stack Tự Động
+# WebEST VPS Panel
 
-Script tự động cài đặt và cấu hình LEMP Stack (Linux, Nginx, MySQL/MariaDB, PHP) cho Ubuntu Server. Script này được thiết kế để tối ưu hóa và bảo mật server cho môi trường production.
+Panel quản lý VPS với các tính năng tự động hóa cho LEMP stack.
 
-## Tính Năng
-
-### 1. Webserver
-- Nginx (phiên bản stable mới nhất)
-- Cấu hình tối ưu cho hiệu suất cao
-- Hỗ trợ HTTP/2, SSL/TLS
-- Tự động cấu hình theo tài nguyên server
-
-### 2. PHP
-- Hỗ trợ PHP 8.1 và 8.3
-- Tùy chọn phiên bản PHP cho từng domain
-- Cài đặt sẵn các extension phổ biến cho Laravel
-- PHP-FPM được tối ưu theo tài nguyên server
-
-### 3. Database
-- MariaDB (phiên bản stable)
-- PostgreSQL (tùy chọn)
-- Tự động tối ưu cấu hình theo RAM
-- Backup tự động
-
-### 4. Bảo Mật
-- Tự động cài đặt SSL với Let's Encrypt
-- UFW Firewall được cấu hình sẵn
-- Fail2ban chống brute force
-- ModSecurity WAF
-- ClamAV Antivirus
-- Các thiết lập bảo mật PHP tối ưu
-
-### 5. Monitoring & Logging
-- Monit để giám sát service
-- Log rotation
-- Error logging
-- Access logging
-
-### 6. Performance
-- Redis/Memcached cho caching
-- Nginx FastCGI cache
-- PHP OpCache
-- MariaDB Query Cache
-
-### 7. Backup System
-- Backup tự động database
-- Backup tự động files
-- Tùy chọn backup remote (rclone)
-- Rotation policy
-
-### 8. Quản Lý Domain
-- Thêm/xóa domain dễ dàng
-- Tùy chọn phiên bản PHP cho từng domain
-- Tùy chọn loại database
-- Hỗ trợ Cloudflare
-
-## Yêu Cầu Hệ Thống
-
-- Ubuntu 20.04/22.04/23.04 LTS
-- Tối thiểu 1GB RAM (khuyến nghị 2GB)
-- Tối thiểu 20GB dung lượng ổ cứng
-- Kết nối internet ổn định
-- Quyền root hoặc sudo
-
-## Cách Sử Dụng
-
-### Cài Đặt Nhanh
+## Cài đặt
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main/setup.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main/install.sh | sudo bash
 ```
 
-hoặc
-
+Sau khi cài đặt xong, sử dụng lệnh:
 ```bash
-wget -O - https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main/setup.sh | sudo bash
+webestvps
 ```
 
-### Cài Đặt An Toàn (Khuyến Nghị)
+## Hướng dẫn sử dụng
 
-1. Tải script về:
+### 1. Tạo domain
+- Chọn mục 1
+- Nhập tên domain (ví dụ: example.com)
+- Script sẽ tạo thư mục và cấu hình Nginx tự động
+
+### 2. Cài đặt SSL
+- Chọn mục 2
+- Nhập tên domain cần cài SSL
+- Script sẽ cài đặt Certbot và cấu hình SSL tự động
+
+### 3. Tạo database
+- Chọn mục 3
+- Nhập tên database
+- Nhập tên user
+- Nhập mật khẩu
+- Script sẽ tạo database và user với quyền truy cập
+
+### 4. Backup
+- Chọn mục 4
+- Nhập tên domain cần backup
+- Script sẽ backup:
+  - Toàn bộ file trong thư mục domain
+  - Database (nếu là WordPress)
+
+### 5. Quản lý service
+- Chọn mục 5
+- Chọn service cần quản lý:
+  1. Nginx
+  2. PHP-FPM
+  3. MariaDB
+  4. Redis
+- Chọn tác vụ:
+  1. Khởi động service
+  2. Dừng service
+  3. Khởi động lại service
+  4. Kiểm tra trạng thái service
+
+### 6. Setup Git Hook (Tự động cập nhật code từ GitHub)
+
+#### Bước 1: Tạo SSH key trên server
 ```bash
-wget https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main/setup.sh
+# Tạo SSH key
+ssh-keygen -t ed25519 -C "your-email@example.com"
+# Hiển thị public key
+cat ~/.ssh/id_ed25519.pub
 ```
 
-2. Phân quyền thực thi:
-```bash
-chmod +x setup.sh
-```
+#### Bước 2: Thêm SSH key vào GitHub
+1. Vào GitHub > Settings > SSH and GPG keys
+2. Click "New SSH key"
+3. Nhập:
+   - Title: Tên server (ví dụ: Production Server)
+   - Key: Dán nội dung public key đã copy ở bước 1
+4. Click "Add SSH key"
 
-3. Chạy script:
-```bash
-sudo ./setup.sh
-```
+#### Bước 3: Cấu hình Git Hook
+1. Chọn mục 6 trong menu
+2. Nhập thông tin:
+   - Tên domain: example.com
+   - Tên repository: user/repo (ví dụ: Webest-Group/script-LEMP-webest)
+   - Tên branch: main (hoặc branch bạn muốn theo dõi)
 
-## Sử Dụng Menu
-
-Sau khi chạy script, bạn sẽ thấy menu chính với các tùy chọn:
-
-1. Cài đặt Nginx
-2. Cài đặt PHP (8.1/8.3)
-3. Cài đặt Database (MariaDB/PostgreSQL)
-4. Cài đặt SSL
-5. Cài đặt Bảo mật
-6. Cài đặt Monitoring
-7. Cài đặt Performance Optimization
-8. Cài đặt Backup System
-9. Quản lý Domain
-10. Cài đặt Development Tools
-11. Cài đặt NodeJS & MongoDB
-12. Xem logs
-
-## Quản Lý Domain
-
-### Thêm Domain Mới
-
-1. Chọn option "Quản lý Domain" từ menu chính
-2. Chọn "Thêm domain mới"
+#### Bước 4: Cấu hình Webhook trên GitHub
+1. Vào repository trên GitHub
+2. Vào Settings > Webhooks > Add webhook
 3. Nhập thông tin:
-   - Tên miền (vd: example.com)
-   - Phiên bản PHP (8.1 hoặc 8.3)
-   - Loại database (MariaDB/PostgreSQL/None)
-   - Sử dụng Cloudflare (Yes/No)
+   - Payload URL: `http://example.com/webhook.php`
+   - Content type: `application/json`
+   - Secret: `webestvps`
+   - Events: Chọn "Just the push event"
+4. Click "Add webhook"
 
-### Xóa Domain
+#### Bước 5: Kiểm tra hoạt động
+1. Push một thay đổi lên repository
+2. Kiểm tra log webhook trên GitHub
+3. Kiểm tra file trên server đã được cập nhật
 
-1. Chọn option "Quản lý Domain" từ menu chính
-2. Chọn "Xóa domain"
-3. Nhập tên miền cần xóa
+### 7. Cập nhật WebEST VPS
+- Chọn mục 7
+- Script sẽ kiểm tra phiên bản mới
+- Nếu có phiên bản mới, chọn y để cập nhật
 
-## Bảo Mật
+### 8. Thoát
+- Chọn mục 8 để thoát khỏi panel
 
-- Tất cả các file cấu hình gốc đều được backup trước khi thay đổi
-- Các mật khẩu được tạo ngẫu nhiên và lưu tại `/root/.server-info`
-- Firewall được cấu hình chỉ cho phép các port cần thiết
-- Fail2ban được cấu hình để bảo vệ khỏi các cuộc tấn công brute force
-
-## Backup
-
-- Database được backup hàng ngày lúc 2 giờ sáng
-- Files được backup hàng ngày lúc 3 giờ sáng
-- Backup được lưu tại `/backup`
-- Các backup cũ hơn 7 ngày sẽ tự động bị xóa
-- Nếu cấu hình backup remote, dữ liệu sẽ được đồng bộ lúc 4 giờ sáng
-
-## Monitoring
-
-- Monit Web Interface: http://your-server-ip:2812
-- Netdata (nếu được cài đặt): http://your-server-ip:19999
-
-## Hỗ Trợ VPS Provider
-
-Script đã được test và tương thích với các nhà cung cấp VPS phổ biến:
-- Digital Ocean
-- Linode
-- Vultr
-- AWS EC2
-- Google Cloud Platform
-- Azure
-
-## Xử Lý Sự Cố
-
-### Log Files
-
-- Nginx: `/var/log/nginx/`
-- PHP-FPM: `/var/log/php/`
-- MariaDB: `/var/log/mysql/`
-- Script Installation: `/var/log/server-setup/`
-
-### Rollback
-
-Nếu có lỗi trong quá trình cài đặt, script sẽ tự động rollback về trạng thái trước đó.
-Các file backup được lưu tại `/root/server-setup-backup-[timestamp]`
-
-## Cập Nhật
-
-Script tự động kiểm tra và cài đặt các bản cập nhật bảo mật quan trọng.
-Để cập nhật script lên phiên bản mới nhất, chạy lại lệnh cài đặt.
-
-## Đóng Góp
-
-Mọi đóng góp đều được chào đón! Vui lòng tạo issue hoặc pull request.
-
-## Giấy Phép
-
-MIT License
-
-## Tác Giả
-
-Webest Group
-- Website: [https://webest.com](https://webest.com)
-- Email: support@webest.com 
+## Lưu ý
+- Đảm bảo chạy script với quyền root (sudo)
+- Kiểm tra log nếu gặp lỗi
+- Đảm bảo domain đã được trỏ về server
+- Đảm bảo server có quyền truy cập repository GitHub
+- Nếu gặp lỗi webhook, kiểm tra log của Nginx và PHP-FPM 
