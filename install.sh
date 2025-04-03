@@ -100,11 +100,24 @@ fix_network() {
 
 # Function kiểm tra gói đã cài đặt
 check_package() {
-    if dpkg -l "$1" &> /dev/null; then
-        log "${GREEN}Gói $1 đã được cài đặt${NC}"
+    local pkg=$1
+    if dpkg -l | grep -q "^ii  $pkg "; then
+        log "${GREEN}Gói $pkg đã được cài đặt${NC}"
         return 0
     else
-        log "${YELLOW}Gói $1 chưa được cài đặt${NC}"
+        log "${YELLOW}Gói $pkg chưa được cài đặt${NC}"
+        return 1
+    fi
+}
+
+# Function kiểm tra service
+check_service() {
+    local service=$1
+    if systemctl is-active --quiet "$service"; then
+        log "${GREEN}Service $service đang hoạt động${NC}"
+        return 0
+    else
+        log "${YELLOW}Service $service không hoạt động${NC}"
         return 1
     fi
 }
@@ -113,18 +126,57 @@ check_package() {
 install_dependencies() {
     log "Đang kiểm tra và cài đặt các gói cần thiết..."
     
-    # Cài đặt git và các công cụ cần thiết
-    for pkg in git curl wget unzip; do
+    # Cập nhật apt
+    apt update
+    
+    # Danh sách các gói cần thiết
+    local base_packages=(
+        git
+        curl
+        wget
+        unzip
+        software-properties-common
+        apt-transport-https
+        ca-certificates
+        gnupg
+    )
+    
+    local lemp_packages=(
+        nginx
+        php8.1-fpm
+        php8.1-cli
+        php8.1-common
+        php8.1-mysql
+        php8.1-zip
+        php8.1-gd
+        php8.1-mbstring
+        php8.1-curl
+        php8.1-xml
+        php8.1-bcmath
+        php8.1-intl
+        mariadb-server
+        redis-server
+    )
+    
+    # Cài đặt các gói cơ bản
+    log "Đang cài đặt các gói cơ bản..."
+    for pkg in "${base_packages[@]}"; do
         if ! check_package "$pkg"; then
             apt install -y "$pkg"
             check_error "Không thể cài đặt gói $pkg"
         fi
     done
     
-    # Cài đặt các gói cho LEMP stack
-    for pkg in nginx php8.1-fpm php8.1-cli php8.1-common php8.1-mysql \
-        php8.1-zip php8.1-gd php8.1-mbstring php8.1-curl php8.1-xml \
-        php8.1-bcmath php8.1-intl mariadb-server redis-server; do
+    # Thêm repository PHP 8.1 nếu chưa có
+    if ! apt-cache policy | grep -q "ondrej/php"; then
+        log "Thêm repository PHP 8.1..."
+        add-apt-repository -y ppa:ondrej/php
+        apt update
+    fi
+    
+    # Cài đặt LEMP stack
+    log "Đang cài đặt LEMP stack..."
+    for pkg in "${lemp_packages[@]}"; do
         if ! check_package "$pkg"; then
             apt install -y "$pkg"
             check_error "Không thể cài đặt gói $pkg"
@@ -143,9 +195,11 @@ install_dependencies() {
     # Cài đặt Node.js và npm nếu chưa có
     if ! command -v node &> /dev/null; then
         log "${YELLOW}Đang cài đặt Node.js...${NC}"
-        curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-        apt install -y nodejs
-        check_error "Không thể cài đặt Node.js"
+        if ! check_package "nodejs"; then
+            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+            apt install -y nodejs
+            check_error "Không thể cài đặt Node.js"
+        fi
     else
         log "${GREEN}Node.js đã được cài đặt${NC}"
     fi
@@ -165,7 +219,17 @@ install_dependencies() {
         check_error "Không thể cài đặt Supervisor"
     fi
     
-    log "${GREEN}Đã cài đặt tất cả các gói cần thiết thành công${NC}"
+    # Kiểm tra các service
+    local services=(nginx php8.1-fpm mariadb redis-server)
+    for service in "${services[@]}"; do
+        if ! check_service "$service"; then
+            systemctl start "$service"
+            systemctl enable "$service"
+            check_error "Không thể khởi động service $service"
+        fi
+    done
+    
+    log "${GREEN}Đã cài đặt và cấu hình tất cả các gói cần thiết thành công${NC}"
 }
 
 # Function tạo file webestvps
