@@ -48,6 +48,7 @@ modules=(
     "modules/backup.sh"
     "modules/domain.sh"
     "modules/development.sh"
+    "modules/nodejs_mongodb.sh"
 )
 
 # Tạo thư mục modules

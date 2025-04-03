@@ -87,8 +87,22 @@ while true; do
         8) source modules/backup.sh ;;
         9) source modules/domain.sh ;;
         10) source modules/development.sh ;;
-        11) source modules/nodejs_mongodb.sh ;;
-        12) less "$LOG_FILE" ;;
+        11) 
+            if [ -f modules/nodejs_mongodb.sh ]; then
+                source modules/nodejs_mongodb.sh
+            else
+                echo -e "${RED}Module NodeJS & MongoDB chưa được cài đặt.${NC}"
+                sleep 2
+            fi 
+            ;;
+        12) 
+            if [ -f "$LOG_FILE" ]; then
+                less "$LOG_FILE" 
+            else
+                echo -e "${RED}File log không tồn tại.${NC}"
+                sleep 2
+            fi
+            ;;
         0) 
             echo -e "${GREEN}Cảm ơn bạn đã sử dụng script!${NC}"
             exit 0 

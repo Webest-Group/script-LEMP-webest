@@ -1,0 +1,313 @@
+#!/bin/bash
+
+# Màu sắc cho terminal
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Kiểm tra quyền root
+if [[ $EUID -ne 0 ]]; then
+    echo -e "${RED}Script này cần chạy với quyền root${NC}"
+    exit 1
+fi
+
+# Các biến môi trường
+REPO_URL="https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main"
+INSTALL_DIR="/opt/webestvps"
+CONFIG_DIR="/etc/webestvps"
+LOG_DIR="/var/log/webestvps"
+VERSION="1.0.0"
+
+# Tạo các thư mục cần thiết
+mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR"
+
+# Kiểm tra xem đã cài đặt chưa
+if [ ! -f "$CONFIG_DIR/installed" ]; then
+    echo -e "${YELLOW}WebEST VPS Panel chưa được cài đặt.${NC}"
+    echo -e "${GREEN}Đang cài đặt...${NC}"
+    
+    # Tải về setup.sh
+    curl -sSL "$REPO_URL/setup.sh" -o "$INSTALL_DIR/setup.sh"
+    chmod +x "$INSTALL_DIR/setup.sh"
+    
+    # Tạo file đánh dấu đã cài đặt
+    touch "$CONFIG_DIR/installed"
+    echo "$VERSION" > "$CONFIG_DIR/version"
+    
+    # Thực hiện cài đặt
+    cd "$INSTALL_DIR" || exit
+    bash setup.sh
+    exit 0
+fi
+
+# Kiểm tra các cập nhật
+check_update() {
+    echo -e "${BLUE}Đang kiểm tra cập nhật...${NC}"
+    
+    # Tải về phiên bản mới nhất
+    CURRENT_VERSION=$(cat "$CONFIG_DIR/version")
+    LATEST_VERSION=$(curl -sSL "$REPO_URL/version.txt" 2>/dev/null || echo "$CURRENT_VERSION")
+    
+    if [ "$LATEST_VERSION" != "$CURRENT_VERSION" ]; then
+        echo -e "${GREEN}Phát hiện phiên bản mới: $LATEST_VERSION (Phiên bản hiện tại: $CURRENT_VERSION)${NC}"
+        echo -e "${YELLOW}Bạn có muốn cập nhật ngay không? (y/n)${NC}"
+        read -r answer
+        if [[ "$answer" =~ ^[Yy]$ ]]; then
+            echo -e "${GREEN}Đang cập nhật...${NC}"
+            
+            # Tải lại setup.sh
+            curl -sSL "$REPO_URL/setup.sh" -o "$INSTALL_DIR/setup.sh"
+            chmod +x "$INSTALL_DIR/setup.sh"
+            
+            # Cập nhật version
+            echo "$LATEST_VERSION" > "$CONFIG_DIR/version"
+            
+            echo -e "${GREEN}Cập nhật hoàn tất!${NC}"
+        else
+            echo -e "${YELLOW}Đã hủy cập nhật.${NC}"
+        fi
+    else
+        echo -e "${GREEN}Bạn đang sử dụng phiên bản mới nhất!${NC}"
+    fi
+}
+
+# Hàm cài đặt Laravel
+install_laravel() {
+    echo -e "${BLUE}Bắt đầu cài đặt Laravel Stack...${NC}"
+    
+    # Tải script cài đặt Laravel
+    curl -sSL "$REPO_URL/laravel_install.sh" -o "$INSTALL_DIR/laravel_install.sh"
+    chmod +x "$INSTALL_DIR/laravel_install.sh"
+    
+    # Thực hiện cài đặt
+    bash "$INSTALL_DIR/laravel_install.sh"
+}
+
+# Hàm tạo site Laravel mới
+create_laravel_site() {
+    echo
+    echo -e "${BLUE}=== TẠO SITE LARAVEL MỚI ===${NC}"
+    echo
+    
+    # Nhập thông tin domain
+    echo -n "Nhập tên miền (VD: example.com): "
+    read -r domain
+    
+    # Kiểm tra xem domain đã tồn tại chưa
+    if [ -f "/etc/nginx/sites-available/$domain" ]; then
+        echo -e "${RED}Domain này đã tồn tại!${NC}"
+        return 1
+    fi
+    
+    # Nhập đường dẫn web root
+    echo -n "Nhập đường dẫn web root (mặc định: /var/www/$domain): "
+    read -r web_root
+    web_root=${web_root:-/var/www/$domain}
+    
+    # Nhập phiên bản Laravel
+    echo -n "Phiên bản Laravel (để trống cho phiên bản mới nhất): "
+    read -r laravel_version
+    
+    # Tạo database
+    echo -n "Tạo database mới? (y/n): "
+    read -r create_db
+    
+    if [[ "$create_db" =~ ^[Yy]$ ]]; then
+        # Tên database
+        db_name=$(echo "$domain" | sed 's/\./_/g')
+        
+        # Tạo tên user và mật khẩu ngẫu nhiên
+        db_user=$(echo "$domain" | sed 's/\./_/g' | cut -c 1-16)
+        db_pass=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9')
+        
+        # Tạo database và user
+        mysql -e "CREATE DATABASE IF NOT EXISTS \`$db_name\`;"
+        mysql -e "CREATE USER IF NOT EXISTS '$db_user'@'localhost' IDENTIFIED BY '$db_pass';"
+        mysql -e "GRANT ALL PRIVILEGES ON \`$db_name\`.* TO '$db_user'@'localhost';"
+        mysql -e "FLUSH PRIVILEGES;"
+        
+        echo -e "${GREEN}Database đã được tạo:${NC}"
+        echo "- Tên database: $db_name"
+        echo "- User: $db_user"
+        echo "- Password: $db_pass"
+    fi
+    
+    # Tạo thư mục web root
+    mkdir -p "$web_root"
+    
+    # Clone Laravel
+    cd "$web_root" || exit
+    if [ -z "$laravel_version" ]; then
+        composer create-project --prefer-dist laravel/laravel .
+    else
+        composer create-project --prefer-dist laravel/laravel:$laravel_version .
+    fi
+    
+    # Sửa quyền
+    chown -R www-data:www-data "$web_root"
+    chmod -R 755 "$web_root"
+    
+    # Cấu hình .env nếu đã tạo database
+    if [[ "$create_db" =~ ^[Yy]$ ]]; then
+        sed -i "s/DB_DATABASE=laravel/DB_DATABASE=$db_name/g" .env
+        sed -i "s/DB_USERNAME=root/DB_USERNAME=$db_user/g" .env
+        sed -i "s/DB_PASSWORD=/DB_PASSWORD=$db_pass/g" .env
+    fi
+    
+    # Tạo cấu hình Nginx
+    cat > "/etc/nginx/sites-available/$domain" << EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $domain www.$domain;
+    root $web_root/public;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+
+    index index.php;
+
+    charset utf-8;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+EOF
+    
+    # Kích hoạt cấu hình và khởi động lại Nginx
+    ln -s "/etc/nginx/sites-available/$domain" "/etc/nginx/sites-enabled/"
+    nginx -t && systemctl restart nginx
+    
+    # Cài đặt SSL
+    echo -n "Cài đặt SSL cho domain này? (y/n): "
+    read -r install_ssl
+    
+    if [[ "$install_ssl" =~ ^[Yy]$ ]]; then
+        certbot --nginx -d "$domain" -d "www.$domain"
+    fi
+    
+    echo -e "${GREEN}Site Laravel đã được tạo thành công tại $web_root${NC}"
+}
+
+# Menu chính
+show_menu() {
+    clear
+    echo -e "${GREEN}===============================================${NC}"
+    echo -e "${GREEN}             WEBEST VPS PANEL                 ${NC}"
+    echo -e "${GREEN}===============================================${NC}"
+    echo -e "Phiên bản: $(cat "$CONFIG_DIR/version")"
+    echo
+    echo -e "${YELLOW}MENU CHÍNH:${NC}"
+    echo "1) Chạy cài đặt LEMP Stack đầy đủ"
+    echo "2) Cài đặt Laravel Stack (Nginx + PHP + MariaDB + Redis + Composer)"
+    echo "3) Tạo site Laravel mới"
+    echo "4) Quản lý domain"
+    echo "5) Quản lý SSL"
+    echo "6) Quản lý Database"
+    echo "7) Quản lý backup"
+    echo "8) Kiểm tra và cài đặt cập nhật"
+    echo "9) Xem logs hệ thống"
+    echo "0) Thoát"
+    echo
+    echo -n "Nhập lựa chọn của bạn [0-9]: "
+}
+
+# Main script
+while true; do
+    show_menu
+    read -r choice
+    
+    case $choice in
+        1)
+            cd "$INSTALL_DIR" || exit
+            bash setup.sh
+            ;;
+        2)
+            install_laravel
+            ;;
+        3)
+            create_laravel_site
+            ;;
+        4)
+            if [ -f "$INSTALL_DIR/modules/domain.sh" ]; then
+                cd "$INSTALL_DIR" || exit
+                bash "$INSTALL_DIR/modules/domain.sh"
+            else
+                echo -e "${RED}Module quản lý domain chưa được cài đặt.${NC}"
+                sleep 2
+            fi
+            ;;
+        5)
+            if [ -f "$INSTALL_DIR/modules/ssl.sh" ]; then
+                cd "$INSTALL_DIR" || exit
+                bash "$INSTALL_DIR/modules/ssl.sh"
+            else
+                echo -e "${RED}Module quản lý SSL chưa được cài đặt.${NC}"
+                sleep 2
+            fi
+            ;;
+        6)
+            if [ -f "$INSTALL_DIR/modules/database.sh" ]; then
+                cd "$INSTALL_DIR" || exit
+                bash "$INSTALL_DIR/modules/database.sh"
+            else
+                echo -e "${RED}Module quản lý database chưa được cài đặt.${NC}"
+                sleep 2
+            fi
+            ;;
+        7)
+            if [ -f "$INSTALL_DIR/modules/backup.sh" ]; then
+                cd "$INSTALL_DIR" || exit
+                bash "$INSTALL_DIR/modules/backup.sh"
+            else
+                echo -e "${RED}Module quản lý backup chưa được cài đặt.${NC}"
+                sleep 2
+            fi
+            ;;
+        8)
+            check_update
+            ;;
+        9)
+            if [ -d "$LOG_DIR" ]; then
+                ls -la "$LOG_DIR"
+                echo -n "Nhập tên file log để xem (hoặc nhấn Enter để quay lại): "
+                read -r logfile
+                if [ -n "$logfile" ] && [ -f "$LOG_DIR/$logfile" ]; then
+                    less "$LOG_DIR/$logfile"
+                fi
+            else
+                echo -e "${RED}Thư mục log không tồn tại.${NC}"
+                sleep 2
+            fi
+            ;;
+        0)
+            echo -e "${GREEN}Cảm ơn bạn đã sử dụng WebEST VPS Panel!${NC}"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Lựa chọn không hợp lệ${NC}"
+            sleep 2
+            ;;
+    esac
+    
+    echo
+    read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
+done 
