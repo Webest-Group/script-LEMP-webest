@@ -291,6 +291,9 @@ update_webestvps() {
     log "Da cap nhat WebEST VPS Panel len phien ban $NEW_VERSION"
     log "Da cap nhat file install.sh goc"
     log "Vui long khoi dong lai panel de ap dung thay doi"
+    
+    # Khởi động lại script
+    exec /usr/local/bin/webestvps
 }
 
 # Hàm quản lý menu chính
