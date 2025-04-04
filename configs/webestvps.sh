@@ -293,43 +293,65 @@ update_webestvps() {
     log "Vui long khoi dong lai panel de ap dung thay doi"
 }
 
-# Hàm quản lý PostgreSQL
-manage_postgresql() {
-    echo "1. Cài đặt PostgreSQL"
-    echo "2. Tạo database"
-    echo "3. Xóa database"
-    echo "4. Xem danh sách database"
-    read -p "Chọn tác vụ: " choice
-    
-    case $choice in
-        1) install_postgresql ;;
-        2) create_postgresql_database ;;
-        3) delete_postgresql_database ;;
-        4) list_postgresql_databases ;;
-        *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
-    esac
+# Hàm quản lý menu chính
+manage_main_menu() {
+    while true; do
+        show_main_menu
+        read -p "Chọn tác vụ: " choice
+        
+        case $choice in
+            1) create_domain ;;
+            2) install_ssl ;;
+            3) create_database ;;
+            4) backup ;;
+            5) manage_services ;;
+            6) setup_git_hook ;;
+            7) update_webestvps ;;
+            8) manage_postgresql ;;
+            9) exit 0 ;;
+            *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
+        esac
+    done
 }
 
-# Trong hàm quản lý service, thêm case cho PostgreSQL
-case $choice in
-    1) manage_service "nginx" ;;
-    2) manage_service "php8.1-fpm" ;;
-    3) manage_service "mariadb" ;;
-    4) manage_service "redis-server" ;;
-    5) manage_postgresql ;;
-    *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
-esac
+# Hàm quản lý service
+manage_services() {
+    while true; do
+        show_service_menu
+        read -p "Chọn service: " choice
+        
+        case $choice in
+            1) manage_service "nginx" ;;
+            2) manage_service "php8.1-fpm" ;;
+            3) manage_service "mariadb" ;;
+            4) manage_service "redis-server" ;;
+            5) manage_postgresql ;;
+            *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
+        esac
+    done
+}
 
-# Trong hàm xử lý menu chính, thêm case cho PostgreSQL
-case $choice in
-    1) create_domain ;;
-    2) install_ssl ;;
-    3) create_database ;;
-    4) backup ;;
-    5) manage_services ;;
-    6) setup_git_hook ;;
-    7) update_webestvps ;;
-    8) install_postgresql ;;
-    9) exit 0 ;;
-    *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
-esac 
+# Hàm quản lý PostgreSQL
+manage_postgresql() {
+    while true; do
+        echo -e "\n${YELLOW}=== Quản lý PostgreSQL ===${NC}"
+        echo "1. Cài đặt PostgreSQL"
+        echo "2. Tạo database"
+        echo "3. Xóa database"
+        echo "4. Xem danh sách database"
+        echo "5. Quay lại menu chính"
+        read -p "Chọn tác vụ: " choice
+        
+        case $choice in
+            1) install_postgresql ;;
+            2) create_postgresql_database ;;
+            3) delete_postgresql_database ;;
+            4) list_postgresql_databases ;;
+            5) return ;;
+            *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
+        esac
+    done
+}
+
+# Gọi hàm quản lý menu chính
+manage_main_menu 
