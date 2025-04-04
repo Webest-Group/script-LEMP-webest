@@ -8,6 +8,7 @@ Panel quan ly VPS voi cac chuc nang:
 - Quan ly service
 - Setup Git Hook
 - Cap nhat tu dong
+- Cai dat them (PostgreSQL, PHP 8.3)
 
 ## Cai dat
 
@@ -25,7 +26,17 @@ De cai dat va cau hinh PostgreSQL, su dung lenh:
 curl -sSL https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main/install-postgresql.sh | sudo bash
 ```
 
-Hoac chon option "Cai dat PostgreSQL" trong menu chinh cua WebEST VPS Panel.
+Hoac chon option "Cai dat them" > "Cai dat PostgreSQL" trong menu chinh cua WebEST VPS Panel.
+
+## Cai dat PHP 8.3
+
+De cai dat va cau hinh PHP 8.3, su dung lenh:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main/install-php83.sh | sudo bash
+```
+
+Hoac chon option "Cai dat them" > "Cai dat PHP 8.3" trong menu chinh cua WebEST VPS Panel.
 
 ## Huong dan su dung
 
@@ -88,6 +99,7 @@ Hoac chon option "Cai dat PostgreSQL" trong menu chinh cua WebEST VPS Panel.
   - MariaDB
   - Redis
   - PostgreSQL
+  - PHP 8.3-FPM
 - Cac tac vu:
   - Khoi dong
   - Dung
@@ -109,13 +121,22 @@ Hoac chon option "Cai dat PostgreSQL" trong menu chinh cua WebEST VPS Panel.
 - Cap nhat cac file cau hinh
 - Khoi dong lai panel
 
-### 8. Cai dat PostgreSQL
+### 8. Cai dat them
+Menu quan ly cac cai dat nang cao:
+
+#### 8.1. Cai dat PostgreSQL
 - Cai dat PostgreSQL server
 - Quan ly database PostgreSQL:
   - Tao database va user
   - Xoa database va user
   - Xem danh sach database
 - Tu dong cau hinh module PHP-PostgreSQL
+
+#### 8.2. Cai dat PHP 8.3
+- Cai dat PHP 8.3 va cac module can thiet
+- Cau hinh PHP 8.3 toi uu
+- Chuyen doi Nginx sang su dung PHP 8.3
+- Kiem tra phien ban PHP
 
 ## Yeu cau he thong
 - Ubuntu 20.04 hoac cao hon
