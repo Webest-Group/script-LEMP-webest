@@ -2,7 +2,7 @@
 
 Panel quan ly VPS voi cac chuc nang:
 - Quan ly domain (Laravel, WordPress, Code normal)
-- Quan ly database
+- Quan ly database (MariaDB, PostgreSQL)
 - Cai dat SSL
 - Backup
 - Quan ly service
@@ -16,6 +16,16 @@ curl -sSL https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main
 ```
 
 Sau khi cai dat xong, chay lenh `webestvps` de su dung panel.
+
+## Cai dat PostgreSQL
+
+De cai dat va cau hinh PostgreSQL, su dung lenh:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Webest-Group/script-LEMP-webest/main/install-postgresql.sh | sudo bash
+```
+
+Hoac chon option "Cai dat PostgreSQL" trong menu chinh cua WebEST VPS Panel.
 
 ## Huong dan su dung
 
@@ -77,6 +87,7 @@ Sau khi cai dat xong, chay lenh `webestvps` de su dung panel.
   - PHP-FPM
   - MariaDB
   - Redis
+  - PostgreSQL
 - Cac tac vu:
   - Khoi dong
   - Dung
@@ -97,6 +108,14 @@ Sau khi cai dat xong, chay lenh `webestvps` de su dung panel.
 - Tu dong kiem tra phien ban moi
 - Cap nhat cac file cau hinh
 - Khoi dong lai panel
+
+### 8. Cai dat PostgreSQL
+- Cai dat PostgreSQL server
+- Quan ly database PostgreSQL:
+  - Tao database va user
+  - Xoa database va user
+  - Xem danh sach database
+- Tu dong cau hinh module PHP-PostgreSQL
 
 ## Yeu cau he thong
 - Ubuntu 20.04 hoac cao hon

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Màu sắc cho terminal
+# Mau sac cho terminal
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -12,95 +12,95 @@ log() {
     echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}"
 }
 
-# Kiểm tra quyền root
+# Kiem tra quyen root
 if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}Vui lòng chạy script với quyền root (sudo)${NC}"
+    echo -e "${RED}Vui long chay script voi quyen root (sudo)${NC}"
     exit 1
 fi
 
-echo -e "${YELLOW}=== Cài đặt và Cấu hình PostgreSQL cho WebEST VPS Panel ===${NC}"
+echo -e "${YELLOW}=== Cai dat va Cau hinh PostgreSQL cho WebEST VPS Panel ===${NC}"
 
-# Bước 1: Cài đặt PostgreSQL nếu chưa được cài đặt
-log "Kiểm tra và cài đặt PostgreSQL..."
+# Buoc 1: Cai dat PostgreSQL neu chua duoc cai dat
+log "Kiem tra va cai dat PostgreSQL..."
 if ! command -v psql &> /dev/null; then
     apt-get update
     apt-get install -y postgresql postgresql-contrib
     systemctl start postgresql
     systemctl enable postgresql
-    log "Đã cài đặt PostgreSQL thành công"
+    log "Da cai dat PostgreSQL thanh cong"
 else
-    log "PostgreSQL đã được cài đặt"
+    log "PostgreSQL da duoc cai dat"
 fi
 
-# Bước 2: Tạo file postgresql.sh nếu chưa tồn tại
-log "Tạo file quản lý PostgreSQL..."
+# Buoc 2: Tao file postgresql.sh neu chua ton tai
+log "Tao file quan ly PostgreSQL..."
 mkdir -p /usr/local/bin/configs
 cat > /usr/local/bin/configs/postgresql.sh << 'EOF'
 #!/bin/bash
 
-# Hàm cài đặt PostgreSQL
+# Ham cai dat PostgreSQL
 install_postgresql() {
-    echo -e "${YELLOW}Đang cài đặt PostgreSQL...${NC}"
+    echo -e "${YELLOW}Dang cai dat PostgreSQL...${NC}"
     
-    # Cài đặt PostgreSQL
+    # Cai dat PostgreSQL
     apt-get update
     apt-get install -y postgresql postgresql-contrib
     
-    # Khởi động service
+    # Khoi dong service
     systemctl start postgresql
     systemctl enable postgresql
     
-    echo -e "${GREEN}Đã cài đặt PostgreSQL thành công!${NC}"
-    echo -e "Mật khẩu mặc định cho user postgres: postgres"
-    echo -e "Để thay đổi mật khẩu, sử dụng lệnh: sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD 'mật_khẩu_mới';\""
+    echo -e "${GREEN}Da cai dat PostgreSQL thanh cong!${NC}"
+    echo -e "Mat khau mac dinh cho user postgres: postgres"
+    echo -e "De thay doi mat khau, su dung lenh: sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD 'mat_khau_moi';\""
 }
 
-# Hàm tạo database PostgreSQL
+# Ham tao database PostgreSQL
 create_postgresql_database() {
-    read -p "Nhập tên database: " dbname
-    read -p "Nhập tên user: " dbuser
-    read -s -p "Nhập mật khẩu: " dbpass
+    read -p "Nhap ten database: " dbname
+    read -p "Nhap ten user: " dbuser
+    read -s -p "Nhap mat khau: " dbpass
     echo
     
-    # Tạo database và user
+    # Tao database va user
     sudo -u postgres psql -c "CREATE DATABASE $dbname;"
     sudo -u postgres psql -c "CREATE USER $dbuser WITH PASSWORD '$dbpass';"
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $dbname TO $dbuser;"
     
-    log "Đã tạo PostgreSQL database $dbname thành công"
+    log "Da tao PostgreSQL database $dbname thanh cong"
 }
 
-# Hàm xóa database PostgreSQL
+# Ham xoa database PostgreSQL
 delete_postgresql_database() {
-    read -p "Nhập tên database cần xóa: " dbname
-    read -p "Nhập tên user cần xóa: " dbuser
+    read -p "Nhap ten database can xoa: " dbname
+    read -p "Nhap ten user can xoa: " dbuser
     
-    # Xóa database và user
+    # Xoa database va user
     sudo -u postgres psql -c "DROP DATABASE IF EXISTS $dbname;"
     sudo -u postgres psql -c "DROP USER IF EXISTS $dbuser;"
     
-    log "Đã xóa PostgreSQL database $dbname và user $dbuser thành công"
+    log "Da xoa PostgreSQL database $dbname va user $dbuser thanh cong"
 }
 
-# Hàm hiển thị danh sách database PostgreSQL
+# Ham hien thi danh sach database PostgreSQL
 list_postgresql_databases() {
-    echo -e "\n${YELLOW}Danh sách PostgreSQL databases:${NC}"
+    echo -e "\n${YELLOW}Danh sach PostgreSQL databases:${NC}"
     sudo -u postgres psql -c "\l"
     
-    echo -e "\n${YELLOW}Danh sách PostgreSQL users:${NC}"
+    echo -e "\n${YELLOW}Danh sach PostgreSQL users:${NC}"
     sudo -u postgres psql -c "\du"
 }
 
-# Hàm quản lý PostgreSQL
+# Ham quan ly PostgreSQL
 manage_postgresql() {
     while true; do
-        echo -e "\n${YELLOW}=== Quản lý PostgreSQL ===${NC}"
-        echo "1. Cài đặt PostgreSQL"
-        echo "2. Tạo database"
-        echo "3. Xóa database"
-        echo "4. Xem danh sách database"
-        echo "5. Quay lại menu chính"
-        read -p "Chọn tác vụ: " choice
+        echo -e "\n${YELLOW}=== Quan ly PostgreSQL ===${NC}"
+        echo "1. Cai dat PostgreSQL"
+        echo "2. Tao database"
+        echo "3. Xoa database"
+        echo "4. Xem danh sach database"
+        echo "5. Quay lai menu chinh"
+        read -p "Chon tac vu: " choice
         
         case $choice in
             1) install_postgresql ;;
@@ -108,83 +108,83 @@ manage_postgresql() {
             3) delete_postgresql_database ;;
             4) list_postgresql_databases ;;
             5) return ;;
-            *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
+            *) echo -e "${RED}Lua chon khong hop le${NC}" ;;
         esac
     done
 }
 EOF
 chmod +x /usr/local/bin/configs/postgresql.sh
-log "Đã tạo file postgresql.sh"
+log "Da tao file postgresql.sh"
 
-# Bước 3: Cập nhật file services.sh để thêm PostgreSQL
-log "Cập nhật file services.sh..."
+# Buoc 3: Cap nhat file services.sh de them PostgreSQL
+log "Cap nhat file services.sh..."
 if [ -f "/usr/local/bin/configs/services.sh" ]; then
-    # Kiểm tra xem PostgreSQL đã được thêm vào chưa
+    # Kiem tra xem PostgreSQL da duoc them vao chua
     if grep -q "postgresql" /usr/local/bin/configs/services.sh; then
-        log "PostgreSQL đã được thêm vào file services.sh"
+        log "PostgreSQL da duoc them vao file services.sh"
     else
-        # Thêm PostgreSQL vào danh sách services
+        # Them PostgreSQL vao danh sach services
         sed -i '/SERVICES=(/a \ \ \ \ "postgresql"' /usr/local/bin/configs/services.sh
-        log "Đã thêm PostgreSQL vào file services.sh"
+        log "Da them PostgreSQL vao file services.sh"
     fi
 else
-    log "File services.sh không tồn tại, sẽ được tạo khi cài đặt WebEST VPS Panel"
+    log "File services.sh khong ton tai, se duoc tao khi cai dat WebEST VPS Panel"
 fi
 
-# Bước 4: Cập nhật file menu.sh để thêm menu PostgreSQL
-log "Cập nhật file menu.sh..."
+# Buoc 4: Cap nhat file menu.sh de them menu PostgreSQL
+log "Cap nhat file menu.sh..."
 if [ -f "/usr/local/bin/configs/menu.sh" ]; then
-    # Kiểm tra xem menu PostgreSQL đã được thêm vào chưa
+    # Kiem tra xem menu PostgreSQL da duoc them vao chua
     if grep -q "Cai dat PostgreSQL" /usr/local/bin/configs/menu.sh; then
-        log "Menu PostgreSQL đã được thêm vào file menu.sh"
+        log "Menu PostgreSQL da duoc them vao file menu.sh"
     else
-        # Thêm PostgreSQL vào menu chính
+        # Them PostgreSQL vao menu chinh
         sed -i 's/echo "8. Thoat"/echo "8. Cai dat PostgreSQL"\n    echo "9. Thoat"/' /usr/local/bin/configs/menu.sh
         
-        # Thêm PostgreSQL vào menu service
+        # Them PostgreSQL vao menu service
         sed -i '/echo "4. Redis"/a \ \ \ \ echo "5. PostgreSQL"' /usr/local/bin/configs/menu.sh
-        log "Đã thêm PostgreSQL vào file menu.sh"
+        log "Da them PostgreSQL vao file menu.sh"
     fi
 else
-    log "File menu.sh không tồn tại, sẽ được tạo khi cài đặt WebEST VPS Panel"
+    log "File menu.sh khong ton tai, se duoc tao khi cai dat WebEST VPS Panel"
 fi
 
-# Bước 5: Cập nhật file webestvps chính
-log "Cập nhật file webestvps chính..."
+# Buoc 5: Cap nhat file webestvps chinh
+log "Cap nhat file webestvps chinh..."
 if [ -f "/usr/local/bin/webestvps" ]; then
-    # Kiểm tra xem postgresql.sh đã được import chưa
+    # Kiem tra xem postgresql.sh da duoc import chua
     if grep -q "postgresql.sh" /usr/local/bin/webestvps; then
-        log "File postgresql.sh đã được import trong webestvps"
+        log "File postgresql.sh da duoc import trong webestvps"
     else
-        # Thêm import postgresql.sh
+        # Them import postgresql.sh
         sed -i '/source "$CONFIG_DIR\/menu.sh"/a source "$CONFIG_DIR/postgresql.sh" || { echo "ERROR: Khong the import postgresql.sh"; exit 1; }' /usr/local/bin/webestvps
-        log "Đã thêm import postgresql.sh vào webestvps"
+        log "Da them import postgresql.sh vao webestvps"
     fi
     
-    # Kiểm tra xử lý menu PostgreSQL
+    # Kiem tra xu ly menu PostgreSQL
     if grep -q "8) manage_postgresql" /usr/local/bin/webestvps; then
-        log "Xử lý menu PostgreSQL đã tồn tại trong webestvps"
+        log "Xu ly menu PostgreSQL da ton tai trong webestvps"
     else
-        # Thay thế exit 0 để thêm menu PostgreSQL
+        # Thay the exit 0 de them menu PostgreSQL
         sed -i 's/7) update_webestvps ;;/7) update_webestvps ;;\n        8) manage_postgresql ;;/' /usr/local/bin/webestvps
         sed -i 's/8) exit 0 ;;/9) exit 0 ;;/' /usr/local/bin/webestvps
-        log "Đã thêm xử lý menu PostgreSQL vào webestvps"
+        log "Da them xu ly menu PostgreSQL vao webestvps"
     fi
 else
-    log "File webestvps không tồn tại, sẽ được tạo khi cài đặt WebEST VPS Panel"
+    log "File webestvps khong ton tai, se duoc tao khi cai dat WebEST VPS Panel"
 fi
 
-# Bước 6: Thêm PHP PostgreSQL module
-log "Cài đặt PHP PostgreSQL module..."
+# Buoc 6: Them PHP PostgreSQL module
+log "Cai dat PHP PostgreSQL module..."
 apt-get install -y php8.1-pgsql
 systemctl restart php8.1-fpm
 
-# Bước 7: Khởi động lại các service
-log "Khởi động lại các service..."
+# Buoc 7: Khoi dong lai cac service
+log "Khoi dong lai cac service..."
 systemctl restart postgresql
 
-# Hoàn tất
-echo -e "\n${GREEN}=== Cài đặt và Cấu hình PostgreSQL Hoàn Tất ===${NC}"
-echo -e "Bạn có thể sử dụng lệnh ${YELLOW}webestvps${NC} và chọn option 8 để quản lý PostgreSQL"
-echo -e "Mật khẩu mặc định cho user postgres: ${YELLOW}postgres${NC}"
-echo -e "Để thay đổi mật khẩu, sử dụng lệnh: ${BLUE}sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD 'mật_khẩu_mới';\"${NC}" 
+# Hoan tat
+echo -e "\n${GREEN}=== Cai dat va Cau hinh PostgreSQL Hoan Tat ===${NC}"
+echo -e "Ban co the su dung lenh ${YELLOW}webestvps${NC} va chon option 8 de quan ly PostgreSQL"
+echo -e "Mat khau mac dinh cho user postgres: ${YELLOW}postgres${NC}"
+echo -e "De thay doi mat khau, su dung lenh: ${BLUE}sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD 'mat_khau_moi';\"${NC}" 
