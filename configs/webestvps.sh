@@ -303,9 +303,37 @@ manage_main_menu() {
         read -p "Chọn tác vụ: " choice
         
         case $choice in
-            1) create_domain ;;
-            2) install_ssl ;;
-            3) create_database ;;
+            1) # Quản lý domain
+                while true; do
+                    show_domain_menu
+                    read -p "Chọn tác vụ: " domain_choice
+                    
+                    case $domain_choice in
+                        1) create_domain ;;
+                        2) delete_domain ;;
+                        3) list_domains ;;
+                        4) break ;;
+                        *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
+                    esac
+                done
+                ;;
+                
+            2) # Quản lý database
+                while true; do
+                    show_database_menu
+                    read -p "Chọn tác vụ: " db_choice
+                    
+                    case $db_choice in
+                        1) create_database ;;
+                        2) delete_database ;;
+                        3) list_databases ;;
+                        4) break ;;
+                        *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
+                    esac
+                done
+                ;;
+                
+            3) install_ssl ;;
             4) backup ;;
             5) manage_services ;;
             6) setup_git_hook ;;
