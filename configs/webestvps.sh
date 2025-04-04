@@ -356,5 +356,58 @@ manage_postgresql() {
     done
 }
 
+# Ham cai dat PostgreSQL
+install_postgresql() {
+    echo -e "${YELLOW}Dang cai dat PostgreSQL...${NC}"
+    
+    # Cai dat PostgreSQL
+    apt-get update
+    apt-get install -y postgresql postgresql-contrib
+    
+    # Khoi dong service
+    systemctl start postgresql
+    systemctl enable postgresql
+    
+    echo -e "${GREEN}Da cai dat PostgreSQL thanh cong!${NC}"
+    echo -e "Mat khau mac dinh cho user postgres: postgres"
+    echo -e "De thay doi mat khau, su dung lenh: sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD 'mat_khau_moi';\""
+}
+
+# Ham tao database PostgreSQL
+create_postgresql_database() {
+    read -p "Nhap ten database: " dbname
+    read -p "Nhap ten user: " dbuser
+    read -s -p "Nhap mat khau: " dbpass
+    echo
+    
+    # Tao database va user
+    sudo -u postgres psql -c "CREATE DATABASE $dbname;"
+    sudo -u postgres psql -c "CREATE USER $dbuser WITH PASSWORD '$dbpass';"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $dbname TO $dbuser;"
+    
+    log "Da tao PostgreSQL database $dbname thanh cong"
+}
+
+# Ham xoa database PostgreSQL
+delete_postgresql_database() {
+    read -p "Nhap ten database can xoa: " dbname
+    read -p "Nhap ten user can xoa: " dbuser
+    
+    # Xoa database va user
+    sudo -u postgres psql -c "DROP DATABASE IF EXISTS $dbname;"
+    sudo -u postgres psql -c "DROP USER IF EXISTS $dbuser;"
+    
+    log "Da xoa PostgreSQL database $dbname va user $dbuser thanh cong"
+}
+
+# Ham hien thi danh sach database PostgreSQL
+list_postgresql_databases() {
+    echo -e "\n${YELLOW}Danh sach PostgreSQL databases:${NC}"
+    sudo -u postgres psql -c "\l"
+    
+    echo -e "\n${YELLOW}Danh sach PostgreSQL users:${NC}"
+    sudo -u postgres psql -c "\du"
+}
+
 # Gọi hàm quản lý menu chính
 manage_main_menu 
