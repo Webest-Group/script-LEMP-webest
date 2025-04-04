@@ -19,4 +19,5 @@ show_service_menu() {
     echo "2. PHP-FPM"
     echo "3. MariaDB"
     echo "4. Redis"
+    echo "5. PostgreSQL"
 } 

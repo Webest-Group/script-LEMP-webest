@@ -7,6 +7,7 @@ SERVICES=(
     "mariadb"
     "redis-server"
     "supervisor"
+    "postgresql"
 )
 
 # Hàm quản lý service
