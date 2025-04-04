@@ -278,10 +278,18 @@ update_webestvps() {
     chmod +x /usr/local/bin/webestvps
     chmod +x /usr/local/bin/configs/*.sh
     
+    # Cập nhật file install.sh gốc
+    if [ -f "/root/install.sh" ]; then
+        cp install.sh /root/install.sh
+        chmod +x /root/install.sh
+        echo -e "${GREEN}Đã cập nhật file install.sh gốc${NC}"
+    fi
+    
     # Xoa thu muc tam
     rm -rf "$TMP_DIR"
     
     log "Da cap nhat WebEST VPS Panel len phien ban $NEW_VERSION"
+    log "Da cap nhat file install.sh goc"
     log "Vui long khoi dong lai panel de ap dung thay doi"
 }
 
