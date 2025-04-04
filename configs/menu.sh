@@ -10,7 +10,8 @@ show_main_menu() {
     echo "5. Quan ly service"
     echo "6. Setup Git Hook"
     echo "7. Cap nhat WebEST VPS"
-    echo "8. Thoat"
+    echo "8. Cai dat PostgreSQL"
+    echo "9. Thoat"
 }
 
 # Menu service

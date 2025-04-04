@@ -310,4 +310,18 @@ case $choice in
     4) manage_service "redis-server" ;;
     5) manage_postgresql ;;
     *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
+esac
+
+# Trong hàm xử lý menu chính, thêm case cho PostgreSQL
+case $choice in
+    1) create_domain ;;
+    2) install_ssl ;;
+    3) create_database ;;
+    4) backup ;;
+    5) manage_services ;;
+    6) setup_git_hook ;;
+    7) update_webestvps ;;
+    8) install_postgresql ;;
+    9) exit 0 ;;
+    *) echo -e "${RED}Lựa chọn không hợp lệ${NC}" ;;
 esac 
